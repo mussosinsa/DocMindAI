@@ -1,0 +1,268 @@
+# docling-translate
+
+<!-- <p align="center">
+  <img src="assets/images/logo.png" alt="docling-translate logo"/>
+</p> -->
+
+> **Docling-based Translator for Technical Documents**  
+> Supports PDF, DOCX, PPTX, HTML, Images, **Code Files & Text Files** with interactive structure-preserving comparison.
+
+[![Stars](https://img.shields.io/github/stars/gyunggyung/docling-translate?style=social)](https://github.com/gyunggyung/docling-translate/stargazers)
+[![Documentation Status](https://readthedocs.org/projects/docling-translate/badge/?version=latest)](https://docling-translate.readthedocs.io/ko/latest/?badge=latest)
+[![License](https://img.shields.io/badge/License-Apache%202.0-yellow.svg)](../LICENSE)
+[![Python](https://img.shields.io/badge/python-3.10%2B-3776AB)](../requirements.txt)
+[![Korean](https://img.shields.io/badge/lang-한국어-blue.svg)](../README.md)
+[![Discussions](https://img.shields.io/github/discussions/gyunggyung/docling-translate?color=6524fa)](https://github.com/gyunggyung/docling-translate/discussions)
+
+## Overview
+
+`docling-translate` is an open-source tool that leverages IBM's [docling](https://github.com/ds4sd/docling) library to analyze complex document structures (tables, images, multi-column layouts) and provide a **sentence-level 1:1 mapping** between the source and translated text.
+
+<p align="center">
+  <img src="assets/images/docling.png" alt="Supported Formats" width="80%">
+</p>
+
+Designed to overcome the **imperfections and context loss** often encountered in machine translation. It goes beyond simple text replacement by providing **Side-by-Side** and **Interactive (Click-to-Reveal)** views, allowing users to instantly check the original text and ensure accurate understanding.
+
+## Demo
+
+<p align="center">
+  <img src="assets/videos/demo.gif" alt="Demo Video" style="max-width: 100%;">
+</p>
+
+## Key Features
+
+- **Multi-Format Support**: Converts and translates `PDF`, `DOCX`, `PPTX`, `HTML`, `Image`, and **Text/Code files** into an **Interactive Viewer (HTML)**.
+- **Sentence-Level Parallel Translation**: Precisely matches one source sentence to one translated sentence for maximum readability.
+- **Layout Preservation**: Maintains tables and images within the document during translation.
+- **Smart Code Translation**: For code files (.py, .js, .ts, .java, .c, .go, etc.), only comments and docstrings are translated while preserving the code structure.
+- **Markdown Rendering**: Markdown files are rendered as HTML with proper formatting (headings, lists, code blocks, etc.).
+- **Flexible Engine Selection**: Supports Google Translate, DeepL, Gemini, OpenAI GPT-5-nano, Qwen(Local), LFM2(Local), LFM2-KOEN-MT(Local), NLLB-200(Local), Yanolja(Local).
+- **High Performance**: Fast parallel processing for large volumes of documents using multi-threading (`max_workers`).
+- **Fast Mode Support**: Accelerated PDF parsing via `pypdfium2` backend for **3-5x faster** processing (`--fast` option).
+
+## Quick Start
+
+### 1. Installation
+
+Requires Python 3.10 or higher.
+
+```bash
+git clone https://github.com/gyunggyung/docling-translate.git
+cd docling-translate
+pip install -r requirements.txt
+```
+
+**(Optional) For Local Translation Model (Qwen, LFM2, Yanolja)**
+To use local LLMs like Qwen, LFM2 or Yanolja, you need to install `llama-cpp-python` and `huggingface_hub`.
+- **Windows Users**: Install [Visual Studio Build Tools](https://visualstudio.microsoft.com/visual-cpp-build-tools/) (Check "Desktop development with C++") then:
+  ```bash
+  pip install llama-cpp-python huggingface_hub
+  ```
+- **Mac/Linux Users**:
+  ```bash
+  pip install llama-cpp-python huggingface_hub
+  ```
+
+**(Optional) CPU Performance Optimization (AVX2 Build) - 2~3x Speed Boost**
+Building with AVX2 instructions enabled can make CPU translation 2~3x faster.
+```powershell
+# Windows (PowerShell)
+pip uninstall llama-cpp-python -y
+$env:CMAKE_ARGS = "-DGGML_AVX2=on"
+pip install llama-cpp-python --force-reinstall --no-cache-dir
+```
+```bash
+# Linux/Mac
+pip uninstall llama-cpp-python -y
+CMAKE_ARGS="-DGGML_AVX2=on" pip install llama-cpp-python --force-reinstall --no-cache-dir
+```
+
+**(Optional) For NLLB Translation Model (nllb, nllb-koen)**
+```bash
+pip install ctranslate2 transformers sentencepiece hf_xet
+```
+
+### 2. CLI Usage
+
+This is the most basic usage. Specify a PDF file to generate an **interactive HTML file**.
+
+```bash
+# Basic translation (English -> Korean)
+python main.py sample.pdf
+
+# Use Fast Mode (3-5x faster, simplified layout)
+python main.py sample.pdf --fast
+
+# With options (Use DeepL engine, translate to Japanese)
+python main.py sample.pdf --engine deepl --target ja
+
+# Use OpenAI GPT-5-nano
+python main.py sample.pdf --engine openai --target ko
+
+# Use LFM2 local model
+python main.py sample.pdf --engine lfm2 --target ko
+
+# Use LFM2-KOEN-MT model (Korean-English specialized, high quality)
+python main.py sample.pdf --engine lfm2-koen-mt --target ko
+
+# Use NLLB-200 model (200 languages support)
+python main.py sample.pdf --engine nllb --target ko
+
+# Translate a Markdown file (rendered as HTML)
+python main.py README.md --source en --target ko
+
+# Translate a Python file (comments/docstrings only)
+python main.py script.py --source ko --target en
+
+# Translate a text file
+python main.py notes.txt --source en --target ko
+```
+
+### API Key Setup (Optional)
+
+To use DeepL, Gemini, or OpenAI, configure API keys in the `.env` file.
+
+```bash
+# Copy .env.example to .env
+cp .env.example .env
+
+# Edit .env file and add your API keys
+OPENAI_API_KEY=sk-proj-your-api-key-here
+DEEPL_API_KEY=your-deepl-key-here
+GEMINI_API_KEY=your-gemini-key-here
+```
+
+**API Key Links**:
+- [OpenAI API Keys](https://platform.openai.com/api-keys) - For GPT-5-nano ($0.05/1M input, $0.40/1M output tokens)
+- [DeepL API](https://www.deepl.com/pro-api)
+- [Google AI Studio](https://aistudio.google.com/app/apikey) - For Gemini
+
+### 3. Web UI Usage
+
+Use the intuitive web interface to upload files and visually verify results.
+
+```bash
+streamlit run app.py
+```
+
+### Web UI Key Features
+
+- **Focus Mode**: Hides the sidebar and controls to let you focus solely on the translation results.
+- **View Mode Control**: Switch between "Inspection Mode" (Side-by-Side) and "Reading Mode" (Translation Only).
+- **Real-time Progress**: View detailed status and real-time progress for each step, including document conversion, text extraction, translation, and image saving.
+- **History Management**: Automatically saves and loads previous translation results.
+
+## Text & Code File Translation
+
+In addition to documents, `docling-translate` supports **smart translation** for various text-based files:
+
+### Supported File Types
+
+| Category | Extensions | Translation Behavior |
+|----------|------------|---------------------|
+| **Markdown** | `.md`, `.markdown` | Full text translated, rendered as HTML |
+| **Code Files** | `.py`, `.js`, `.ts`, `.java`, `.c`, `.cpp`, `.go`, `.rs`, etc. | **Comments & docstrings only** - code structure preserved |
+| **Config Files** | `.json`, `.yaml`, `.toml`, `.xml` | Full content translated |
+| **Plain Text** | `.txt`, `.log` | Full text translated by paragraph |
+| **No Extension** | `LICENSE`, `README`, etc. | Detected as text, translated by paragraph |
+
+### Code File Features
+
+- **Original code structure preserved** with line numbers
+- **Toggle between translated/original comments** with a single click
+- **Hover over translated comments** to see the original text in a tooltip
+- **Dark/Light theme** support
+
+## Architecture
+
+<p align="center">
+  <img src="assets/images/architecture.png" alt="Architecture Diagram" width="100%">
+</p>
+
+## Detailed Guide
+
+For more detailed usage and configuration instructions, please refer to the documents below.
+
+- [📖 **Detailed Usage Guide (USAGE.md)**](USAGE.md): Full CLI options, API key setup, format specifics.
+- [🛠 **Contributing Guide (CONTRIBUTING.md)**](CONTRIBUTING.md): Project structure, development workflow, testing methods.
+- [🤝 **Support Guide (SUPPORT.md)**](SUPPORT.md): How to join the community and ask questions.
+
+## Project Website
+
+<p align="center">
+  <img src="assets/images/qr.png" alt="Scan to Visit Website">
+</p>
+
+<!-- <p align="center">
+  <a href="https://gyunggyung.github.io/docling-translate/">https://gyunggyung.github.io/docling-translate/</a>
+</p> -->
+
+## Acknowledgments
+
+This project is built upon the [Docling](https://github.com/docling-project/docling) library. It also utilizes open-source models from [Qwen](https://huggingface.co/Qwen/Qwen3-0.6B-GGUF), [LFM2](https://huggingface.co/LiquidAI/LFM2-1.2B-GGUF), [LFM2-KOEN-MT](https://huggingface.co/gyung/lfm2-1.2b-koen-mt-v8-rl-10k-merged-GGUF) (Korean-English specialized), [NLLB-200](https://huggingface.co/facebook/nllb-200-distilled-600M) (200 languages), and [Yanolja](https://huggingface.co/yanolja/YanoljaNEXT-Rosetta-4B-2511-GGUF) for local translation capabilities.
+
+```bibtex
+@techreport{Docling,
+  author = {Deep Search Team},
+  title = {Docling Technical Report},
+  url = {https://arxiv.org/abs/2408.09869},
+  year = {2024}
+}
+
+@misc{qwen3,
+  title  = {Qwen3},
+  url    = {https://qwenlm.github.io/blog/qwen3/},
+  author = {Qwen Team},
+  month  = {April},
+  year   = {2025}
+}
+
+@misc{yanolja2025yanoljanextrosetta,
+  author = {Yanolja NEXT Co., Ltd.},
+  title = {YanoljaNEXT-Rosetta-4B-2511},
+  year = {2025},
+  publisher = {Hugging Face},
+  journal = {Hugging Face repository},
+  howpublished = {\\url{https://huggingface.co/yanolja/YanoljaNEXT-Rosetta-4B-2511}}
+}
+
+@article{liquidai2025lfm2technicalreport,
+  title={LFM2 Technical Report}, 
+  author={Liquid AI},
+  year={2025},
+  eprint={2511.23404},
+  archivePrefix={arXiv},
+  primaryClass={cs.LG},
+  url={https://arxiv.org/abs/2511.23404}, 
+}
+
+@article{nllb2022,
+  title={No Language Left Behind: Scaling Human-Centered Machine Translation},
+  author={NLLB Team et al.},
+  journal={arXiv preprint arXiv:2207.04672},
+  year={2022},
+  url={https://arxiv.org/abs/2207.04672}
+}
+
+@misc{nllb-finetuned-en2ko,
+  author = {Jisu Kim, Juhwan Lee, TakSung Heo, Minsu Jeong},
+  title = {NLLB Fine-tuned English to Korean},
+  year = {2024},
+  publisher = {Hugging Face},
+  howpublished = {\\url{https://huggingface.co/NHNDQ/nllb-finetuned-en2ko}}
+}
+
+@misc{lfm2-koen-mt,
+  author = {gyung},
+  title = {LFM2-1.2B-KOEN-MT: Korean-English Translation Model},
+  year = {2025},
+  publisher = {Hugging Face},
+  howpublished = {\\url{https://huggingface.co/gyung/lfm2-1.2b-koen-mt-v8-rl-10k-merged-GGUF}}
+}
+
+```
+
+## License
+
+This project follows the [Apache License 2.0](../LICENSE).
