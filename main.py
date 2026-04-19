@@ -10,6 +10,7 @@ Docling PDF 번역기의 CLI(Command Line Interface) 진입점입니다.
 
 지원 파일 형식:
 - 문서: PDF, DOCX, PPTX, HTML, Image
+- 한글 문서: HWP, HWPX (pyhwp 필요: pip install pyhwp)
 - 텍스트: .md, .txt, .json, .yaml 등
 - 코드: .py, .js, .ts, .java, .c, .go 등 (주석/독스트링만 번역)
 
@@ -40,7 +41,7 @@ def main():
     parser = argparse.ArgumentParser(description="Docling PDF Translator CLI")
     
     # 필수 인수: 입력 파일 경로
-    parser.add_argument("input_file", help="Path to the input file (PDF, DOCX, PPTX, HTML, Image, .md, .py, .txt, etc.)")
+    parser.add_argument("input_file", help="Path to the input file (PDF, DOCX, PPTX, HTML, Image, HWP, HWPX, .md, .py, .txt, etc.)")
     
     # 선택 인수
     parser.add_argument("--source", default="en", help="Source language code (default: en)")

@@ -164,6 +164,8 @@ def main():
         type=[
             # 기존 Docling 지원
             "pdf", "docx", "pptx", "html", "htm", "png", "jpg", "jpeg",
+            # 한글 문서
+            "hwp", "hwpx",
             # 텍스트/마크다운
             "txt", "md", "markdown", "rst",
             # 프로그래밍 언어 (주석 번역)

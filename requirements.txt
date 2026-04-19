@@ -8,3 +8,4 @@ openai>=2.8.0
 streamlit>=1.30.0
 watchdog>=3.0.0
 markdown>=3.5.0
+pyhwp>=0.6b12

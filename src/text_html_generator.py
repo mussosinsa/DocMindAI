@@ -603,6 +603,10 @@ def get_file_type_display(ext: str) -> str:
         "txt": "Plain Text",
         "text": "Plain Text",
         "log": "Log File",
+
+        # 한글 문서
+        "hwp": "HWP 문서",
+        "hwpx": "HWPX 문서",
     }
     
     # 확장자가 없는 경우
