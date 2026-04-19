@@ -53,6 +53,20 @@ cd docling-translate
 pip install -r requirements.txt
 ```
 
+### Docker로 실행 (권장)
+
+Docker만 설치되어 있으면 별도 Python 환경 없이 바로 실행할 수 있습니다.
+
+```bash
+# 이미지 빌드
+docker build -t docmindai .
+
+# Web UI 실행 (http://localhost:8501)
+docker run --rm -p 8501:8501 --env-file .env docmindai
+```
+
+`.env` 파일이 없다면 `--env-file .env` 옵션을 제거해도 됩니다. (DeepL/Gemini/OpenAI 엔진 미사용 시)
+
 **(선택) 로컬 번역 모델(Qwen, LFM2, Yanolja) 사용 시**
 Qwen, LFM2 등 로컬 LLM을 사용하려면 `llama-cpp-python`과 `huggingface_hub`를 추가로 설치해야 합니다.
 - **Windows 사용자**: [Visual Studio Build Tools](https://visualstudio.microsoft.com/visual-cpp-build-tools/) 설치 ("C++를 사용한 데스크톱 개발" 체크) 후:
