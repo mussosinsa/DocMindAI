@@ -229,6 +229,7 @@ streamlit run app.py
 더 자세한 사용법과 설정 방법은 아래 문서를 참고하세요.
 
 - [📖 **상세 사용 가이드 (USAGE.md)**](docs/USAGE.md): CLI 전체 옵션, API 키 설정, 포맷별 특징.
+- [🚀 **설치 및 사용 가이드 (INSTALL_AND_USAGE.md)**](docs/INSTALL_AND_USAGE.md): 로컬 설치, Docker Compose, REST API 연동까지 한 번에 확인.
 - [🛠 **기여 가이드 (CONTRIBUTING.md)**](docs/CONTRIBUTING.md): 프로젝트 구조, 개발 워크플로우, 테스트 방법.
 - [🤝 **지원 가이드 (SUPPORT.md)**](SUPPORT.md): 커뮤니티 참여 및 질문 방법.
 
