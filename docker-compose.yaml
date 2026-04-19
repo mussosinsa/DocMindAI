@@ -1,5 +1,5 @@
 services:
-  docmindai:
+  docmindai-web:
     build:
       context: .
       dockerfile: Dockerfile
@@ -10,3 +10,15 @@ services:
       - path: .env
         required: false
     command: ["streamlit", "run", "app.py", "--server.address=0.0.0.0", "--server.port=8501"]
+
+  docmindai-api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: docmindai:latest
+    ports:
+      - "8000:8000"
+    env_file:
+      - path: .env
+        required: false
+    command: ["uvicorn", "api:app", "--host", "0.0.0.0", "--port", "8000"]

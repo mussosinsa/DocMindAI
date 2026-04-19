@@ -58,9 +58,13 @@ pip install -r requirements.txt
 Docker만 설치되어 있으면 별도 Python 환경 없이 바로 실행할 수 있습니다.
 
 ```bash
-# 이미지 빌드 + Web UI 실행 (http://localhost:8501)
+# 이미지 빌드 + 서비스 실행
 docker compose up --build
 ```
+
+실행 후 접속:
+- **Web UI**: `http://localhost:8501`
+- **REST API**: `http://localhost:8000` (Swagger: `http://localhost:8000/docs`)
 
 백그라운드 실행 시:
 
@@ -75,6 +79,20 @@ docker compose down
 ```
 
 `.env` 파일이 있으면 자동으로 읽고, 없어도 정상 동작합니다. (DeepL/Gemini/OpenAI 엔진 미사용 시)
+
+### REST API 연동 예시
+
+```bash
+curl -X POST "http://localhost:8000/api/v1/translate" \
+  -F "file=@sample.pdf" \
+  -F "source=en" \
+  -F "target=ko" \
+  -F "engine=google" \
+  -F "workers=8" \
+  -F "fast=false"
+```
+
+응답의 `html_download_url`로 생성된 결과 HTML을 다운로드할 수 있습니다.
 
 **(선택) 로컬 번역 모델(Qwen, LFM2, Yanolja) 사용 시**
 Qwen, LFM2 등 로컬 LLM을 사용하려면 `llama-cpp-python`과 `huggingface_hub`를 추가로 설치해야 합니다.
