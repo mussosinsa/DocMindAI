@@ -53,6 +53,47 @@ cd docling-translate
 pip install -r requirements.txt
 ```
 
+### Docker Compose로 실행 (권장)
+
+Docker만 설치되어 있으면 별도 Python 환경 없이 바로 실행할 수 있습니다.
+
+```bash
+# 이미지 빌드 + 서비스 실행
+docker compose up --build
+```
+
+실행 후 접속:
+- **Web UI**: `http://localhost:8501`
+- **REST API**: `http://localhost:8000` (Swagger: `http://localhost:8000/docs`)
+
+백그라운드 실행 시:
+
+```bash
+docker compose up --build -d
+```
+
+중지 시:
+
+```bash
+docker compose down
+```
+
+`.env` 파일이 있으면 자동으로 읽고, 없어도 정상 동작합니다. (DeepL/Gemini/OpenAI 엔진 미사용 시)
+
+### REST API 연동 예시
+
+```bash
+curl -X POST "http://localhost:8000/api/v1/translate" \
+  -F "file=@sample.pdf" \
+  -F "source=en" \
+  -F "target=ko" \
+  -F "engine=google" \
+  -F "workers=8" \
+  -F "fast=false"
+```
+
+응답의 `html_download_url`로 생성된 결과 HTML을 다운로드할 수 있습니다.
+
 **(선택) 로컬 번역 모델(Qwen, LFM2, Yanolja) 사용 시**
 Qwen, LFM2 등 로컬 LLM을 사용하려면 `llama-cpp-python`과 `huggingface_hub`를 추가로 설치해야 합니다.
 - **Windows 사용자**: [Visual Studio Build Tools](https://visualstudio.microsoft.com/visual-cpp-build-tools/) 설치 ("C++를 사용한 데스크톱 개발" 체크) 후:
@@ -188,6 +229,7 @@ streamlit run app.py
 더 자세한 사용법과 설정 방법은 아래 문서를 참고하세요.
 
 - [📖 **상세 사용 가이드 (USAGE.md)**](docs/USAGE.md): CLI 전체 옵션, API 키 설정, 포맷별 특징.
+- [🚀 **설치 및 사용 가이드 (INSTALL_AND_USAGE.md)**](docs/INSTALL_AND_USAGE.md): 로컬 설치, Docker Compose, REST API 연동까지 한 번에 확인.
 - [🛠 **기여 가이드 (CONTRIBUTING.md)**](docs/CONTRIBUTING.md): 프로젝트 구조, 개발 워크플로우, 테스트 방법.
 - [🤝 **지원 가이드 (SUPPORT.md)**](SUPPORT.md): 커뮤니티 참여 및 질문 방법.
 
