@@ -1,0 +1,12 @@
+services:
+  docmindai:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: docmindai:latest
+    ports:
+      - "8501:8501"
+    env_file:
+      - path: .env
+        required: false
+    command: ["streamlit", "run", "app.py", "--server.address=0.0.0.0", "--server.port=8501"]
