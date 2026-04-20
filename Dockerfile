@@ -86,9 +86,11 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 # ---------------------------------------------------------------------------
 COPY requirements.txt .
 
-# CPU-only PyTorch — CUDA 라이브러리(~4 GB) 제외로 이미지 크기 대폭 절감
+# CPU-only PyTorch + torchvision — CUDA 라이브러리(~4 GB) 제외로 이미지 크기 대폭 절감
+# torchvision 을 함께 CPU 인덱스에서 설치하지 않으면, docling 의존성 해소 과정에서
+# PyPI 의 CUDA 버전 torchvision 이 설치되어 transformers AutoProcessor 임포트 오류 발생
 RUN pip install --upgrade pip && \
-    pip install torch --index-url https://download.pytorch.org/whl/cpu && \
+    pip install torch torchvision --index-url https://download.pytorch.org/whl/cpu && \
     pip install -r requirements.txt
 
 # ---------------------------------------------------------------------------
