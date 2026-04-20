@@ -68,6 +68,7 @@ from src.utils import ensure_nltk_resources
 from src.text_parser import TextFileParser, is_text_file
 from src.text_html_generator import generate_text_html, get_file_type_display, generate_code_file_html
 from src.hwp_parser import is_hwp_file
+from src.mineru_parser import is_mineru_available
 
 # 진행률 콜백 타입 정의 (float: 진행률 0.0~1.0, str: 상태 메시지)
 ProgressCallback = Callable[[float, str], None]
@@ -485,6 +486,171 @@ def process_hwp_file(
     }
 
 
+def process_single_file_with_mineru(
+    file_path: str,
+    source_lang: str,
+    target_lang: str,
+    engine: str,
+    max_workers: int = 1,
+    mineru_backend: str = "pipeline",
+    progress_cb: Optional[ProgressCallback] = None,
+    ui_lang: str = "ko",
+) -> dict:
+    """
+    MinerU 백엔드를 사용한 문서 처리 파이프라인.
+
+    MinerU의 고품질 레이아웃 분석으로 PDF를 파싱한 후 번역합니다:
+    - 다단(Multi-column) 레이아웃 정확한 읽기 순서
+    - 수식 LaTeX 자동 변환 (MathJax로 렌더링)
+    - 표 HTML 구조 추출
+    - 스캔 PDF OCR 지원
+
+    Args:
+        file_path: 처리할 파일 경로
+        source_lang: 원본 언어 코드
+        target_lang: 대상 언어 코드
+        engine: 번역 엔진
+        max_workers: 병렬 워커 수
+        mineru_backend: MinerU 엔진
+            - "pipeline"           : CPU 친화적 (기본)
+            - "vlm-auto-engine"    : 고정확도, GPU 권장
+            - "hybrid-auto-engine" : 균형 잡힌 성능
+        progress_cb: 진행률 콜백
+        ui_lang: UI 언어
+
+    Returns:
+        결과 정보 딕셔너리 (output_dir, html_path)
+    """
+    from src.mineru_parser import parse_with_mineru
+    from src.text_parser import TextFileParser
+
+    ensure_nltk_resources()
+
+    msgs = PROGRESS_MESSAGES.get(ui_lang, PROGRESS_MESSAGES["ko"])
+    file_name = Path(file_path).name
+
+    bench.start(f"Total Process (MinerU): {file_name}")
+
+    if progress_cb:
+        progress_cb(0.02, msgs["analyzing"].format(file_name=file_name))
+
+    if not os.path.exists(file_path):
+        logging.error(f"입력 파일을 찾을 수 없습니다: {file_path}")
+        if progress_cb:
+            progress_cb(1.0, msgs["error_search"].format(file_name=file_name))
+        return {}
+
+    base_filename = Path(file_path).stem
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    output_dir = Path("output") / f"{base_filename}_{source_lang}_to_{target_lang}_{timestamp}"
+    output_dir.mkdir(parents=True, exist_ok=True)
+
+    mineru_work_dir = output_dir / "_mineru"
+
+    # 1. MinerU 파싱
+    if progress_cb:
+        progress_cb(0.05, f"📄 MinerU 문서 분석 중... ({file_name})")
+
+    bench.start(f"MinerU Conversion: {file_name}")
+    try:
+        markdown_content, _content_blocks = parse_with_mineru(
+            file_path=file_path,
+            output_dir=str(mineru_work_dir),
+            backend=mineru_backend,
+        )
+    except Exception as e:
+        logging.error(f"[{file_name}] MinerU 파싱 오류: {e}", exc_info=True)
+        if progress_cb:
+            progress_cb(1.0, msgs["error_convert"].format(file_name=file_name))
+        return {}
+    bench.end(f"MinerU Conversion: {file_name}")
+    logging.info(f"[{file_name}] MinerU 변환 성공 ({len(markdown_content)} 문자)")
+
+    if progress_cb:
+        progress_cb(0.25, msgs["extracting"].format(file_name=file_name))
+
+    # 2. Markdown → 번역 세그먼트 추출
+    parser = TextFileParser()
+    segments = parser._parse_markdown(markdown_content)
+    translatable_texts = parser.get_translatable_texts(segments)
+    unique_texts = list(set(translatable_texts))
+
+    logging.info(
+        f"[{file_name}] 세그먼트 {len(segments)}개, "
+        f"번역 대상 {len(unique_texts)}개"
+    )
+
+    if progress_cb:
+        progress_cb(0.30, msgs["translating_start"].format(count=len(unique_texts)))
+
+    # 3. 번역
+    bench.start(f"Translation (MinerU): {file_name}")
+    t_trans_start = time.time()
+
+    TRANSLATE_BASE = 0.30
+    TRANSLATE_SPAN = 0.55
+
+    def _translate_progress(local_ratio: float, msg: str):
+        if progress_cb:
+            progress_cb(
+                TRANSLATE_BASE + TRANSLATE_SPAN * local_ratio,
+                msgs["translating_progress"].format(msg=msg)
+            )
+
+    translator = create_translator(engine)
+    translated_results = translator.translate_batch(
+        unique_texts,
+        src=source_lang,
+        dest=target_lang,
+        max_workers=max_workers,
+        progress_cb=_translate_progress,
+    )
+
+    t_trans_end = time.time()
+    translation_map = dict(zip(unique_texts, translated_results))
+
+    bench.end(f"Translation (MinerU): {file_name}")
+    logging.info(f"[{file_name}] 번역 완료 ({t_trans_end - t_trans_start:.2f}초)")
+
+    # 4. HTML 생성
+    if progress_cb:
+        progress_cb(0.87, msgs["saving"].format(file_name=file_name))
+
+    GEN_BASE = 0.87
+    GEN_SPAN = 0.13
+
+    def _gen_progress(local_ratio: float, msg: str):
+        if progress_cb:
+            progress_cb(
+                GEN_BASE + GEN_SPAN * local_ratio,
+                msgs["saving_progress"].format(msg=msg)
+            )
+
+    html_content = generate_text_html(
+        file_name=file_name,
+        segments=segments,
+        translation_map=translation_map,
+        file_type=f"PDF · MinerU ({mineru_backend})",
+        is_markdown=True,
+        progress_cb=_gen_progress,
+    )
+
+    path_html = output_dir / f"{base_filename}_interactive.html"
+    with open(path_html, "w", encoding="utf-8") as f:
+        f.write(html_content)
+
+    if progress_cb:
+        progress_cb(1.0, msgs["done"].format(file_name=file_name))
+
+    bench.end(f"Total Process (MinerU): {file_name}")
+    logging.info(f"[{file_name}] MinerU 처리 완료: {output_dir}")
+
+    return {
+        "output_dir": output_dir,
+        "html_path": path_html,
+    }
+
+
 def process_single_file(
     file_path: str,
     converter: DocumentConverter,
@@ -721,11 +887,38 @@ def process_document(
     max_workers: int = 8,
     progress_cb: Optional[ProgressCallback] = None,
     ui_lang: str = "ko",
+    parser_backend: str = "docling",
+    mineru_backend: str = "pipeline",
 ) -> dict:
     """
     외부(app.py, main.py)에서 호출하기 위한 편의성 래퍼 함수입니다.
-    process_single_file을 호출합니다.
+
+    Args:
+        parser_backend: "docling" (기본) | "mineru" (고품질 PDF 분석)
+        mineru_backend: MinerU 엔진 선택
+            - "pipeline"           : CPU 친화적 (기본)
+            - "vlm-auto-engine"    : 고정확도, GPU 권장
+            - "hybrid-auto-engine" : 균형 잡힌 성능
     """
+    # MinerU 백엔드: PDF/이미지 파일에만 적용 (DOCX/PPTX는 Docling 사용)
+    mineru_supported_exts = {'.pdf', '.png', '.jpg', '.jpeg', '.bmp', '.tiff', '.tif', '.webp'}
+    if (
+        parser_backend == "mineru"
+        and Path(file_path).suffix.lower() in mineru_supported_exts
+        and not is_text_file(file_path)
+        and not is_hwp_file(file_path)
+    ):
+        return process_single_file_with_mineru(
+            file_path=file_path,
+            source_lang=source_lang,
+            target_lang=dest_lang,
+            engine=engine,
+            max_workers=max_workers,
+            mineru_backend=mineru_backend,
+            progress_cb=progress_cb,
+            ui_lang=ui_lang,
+        )
+
     return process_single_file(
         file_path=file_path,
         converter=converter,
@@ -734,5 +927,5 @@ def process_document(
         engine=engine,
         max_workers=max_workers,
         progress_cb=progress_cb,
-        ui_lang=ui_lang
+        ui_lang=ui_lang,
     )

@@ -28,6 +28,7 @@ from datetime import datetime
 from src.core import process_document, create_converter
 from src.i18n import t, set_current_lang, get_current_lang
 from src.utils import inject_images, load_history_from_disk
+from src.mineru_parser import is_mineru_available
 
 # 로깅 설정
 logging.basicConfig(level=logging.INFO)
@@ -123,6 +124,47 @@ def main():
             help=t("speed_mode_help"),
             disabled="is_processing" in st.session_state and st.session_state["is_processing"]
         )
+
+        # [NEW] 파서 백엔드 선택 (MinerU 통합)
+        st.markdown("---")
+        st.subheader("🔬 파서 백엔드")
+        _mineru_ok = is_mineru_available()
+        parser_backend_opts = ["docling"]
+        if _mineru_ok:
+            parser_backend_opts.append("mineru")
+
+        parser_backend = st.radio(
+            "문서 파서",
+            options=parser_backend_opts,
+            format_func=lambda x: {
+                "docling": "Docling (기본)",
+                "mineru": "MinerU (고품질 PDF)",
+            }[x],
+            index=0,
+            horizontal=True,
+            help=(
+                "Docling: 빠른 범용 파서\n"
+                "MinerU: 다단 레이아웃·수식·OCR 특화 (PDF/이미지 전용)\n"
+                + ("" if _mineru_ok else "\n⚠️ MinerU 미설치: pip install \"mineru[all]\"")
+            ),
+            disabled="is_processing" in st.session_state and st.session_state["is_processing"]
+        )
+        if not _mineru_ok:
+            st.caption("⚠️ MinerU 미설치 — `pip install \"mineru[all]\"`")
+
+        mineru_backend = "pipeline"
+        if parser_backend == "mineru":
+            mineru_backend = st.selectbox(
+                "MinerU 엔진",
+                options=["pipeline", "vlm-auto-engine", "hybrid-auto-engine"],
+                format_func=lambda x: {
+                    "pipeline": "Pipeline (CPU 친화적)",
+                    "vlm-auto-engine": "VLM (고정확도, GPU 권장)",
+                    "hybrid-auto-engine": "Hybrid (균형)",
+                }[x],
+                index=0,
+                help="pipeline: 86% 정확도 / vlm-auto-engine: 90% 정확도 (GPU 필요)",
+            )
 
     # 3. 메인 영역: 타이틀 및 파일 업로드
     st.title(t("app_title"))
@@ -228,7 +270,9 @@ def main():
                         engine=engine,
                         max_workers=max_workers,
                         progress_cb=update_progress,
-                        ui_lang=get_current_lang()
+                        ui_lang=get_current_lang(),
+                        parser_backend=parser_backend,
+                        mineru_backend=mineru_backend,
                     )
                     
                     if result:

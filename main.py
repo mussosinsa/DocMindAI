@@ -14,6 +14,10 @@ Docling PDF 번역기의 CLI(Command Line Interface) 진입점입니다.
 - 텍스트: .md, .txt, .json, .yaml 등
 - 코드: .py, .js, .ts, .java, .c, .go 등 (주석/독스트링만 번역)
 
+파서 백엔드:
+- docling (기본): 빠른 범용 파서
+- mineru: 고품질 PDF 레이아웃 분석 (pip install "mineru[all]" 필요)
+
 사용 예시:
     python main.py document.pdf --source en --target ko --engine google
     python main.py README.md --source en --target ko
@@ -49,6 +53,18 @@ def main():
     parser.add_argument("--engine", default="google", choices=["google", "deepl", "gemini", "openai", "qwen-0.6b", "lfm2", "lfm2-koen-mt", "nllb", "nllb-koen", "yanolja"], help="Translation engine (default: google)")
     parser.add_argument("--workers", type=int, default=8, help="Number of parallel workers (default: 8)")
     parser.add_argument("--fast", action="store_true", help="Enable fast mode (optimized for speed)")
+    parser.add_argument(
+        "--parser",
+        default="docling",
+        choices=["docling", "mineru"],
+        help="Document parser backend (default: docling). 'mineru' provides better layout analysis for PDFs."
+    )
+    parser.add_argument(
+        "--mineru-backend",
+        default="pipeline",
+        choices=["pipeline", "vlm-auto-engine", "hybrid-auto-engine"],
+        help="MinerU engine (only used when --parser=mineru). pipeline: CPU-friendly, vlm-auto-engine: high accuracy."
+    )
 
     args = parser.parse_args()
 
@@ -72,7 +88,9 @@ def main():
         source_lang=args.source,
         dest_lang=args.target,
         engine=args.engine,
-        max_workers=workers
+        max_workers=workers,
+        parser_backend=args.parser,
+        mineru_backend=args.mineru_backend,
     )
 
     if result:
