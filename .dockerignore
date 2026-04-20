@@ -1,0 +1,51 @@
+# Git
+.git
+.gitignore
+
+# Python 캐시
+__pycache__/
+*.py[cod]
+*.pyo
+.Python
+*.egg-info/
+dist/
+build/
+.eggs/
+
+# 가상 환경
+.venv/
+venv/
+env/
+
+# 번역 결과물 (volume으로 마운트)
+output/
+
+# 환경 변수 (보안)
+.env
+.env.*
+!.env.example
+
+# IDE / OS
+.idea/
+.vscode/
+*.swp
+*.swo
+.DS_Store
+Thumbs.db
+
+# 문서 / 샘플 (빌드에 불필요)
+docs/
+plans/
+samples/
+*.md
+!README.md
+
+# 테스트
+tests/
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Docker 파일 자체 (불필요한 레이어 방지)
+Dockerfile*
+docker-compose*

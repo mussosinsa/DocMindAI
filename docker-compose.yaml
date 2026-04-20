@@ -1,0 +1,113 @@
+# =============================================================================
+# DocMindAI — docker-compose
+# =============================================================================
+# 서비스 구성:
+#   api  - REST API 서버    (http://localhost:8000, Swagger: /docs)
+#   ui   - Streamlit 웹 UI  (http://localhost:8501)
+#
+# 실행:
+#   docker compose up --build          # api + ui 동시 실행
+#   docker compose up api              # REST API 만 실행
+#   docker compose up ui               # Streamlit UI 만 실행
+#
+# 환경 변수:
+#   .env 파일에 API 키 등 설정 (아래 .env.example 참고)
+#   OPENAI_API_KEY, DEEPL_API_KEY, GEMINI_API_KEY 등
+# =============================================================================
+
+services:
+
+  # ---------------------------------------------------------------------------
+  # REST API 서버
+  # ---------------------------------------------------------------------------
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: docmindai:latest
+    container_name: docmindai-api
+    command: >
+      uvicorn api:app
+      --host 0.0.0.0
+      --port 8000
+      --workers 1
+    ports:
+      - "${API_PORT:-8000}:8000"
+    volumes:
+      # 번역 결과물 영구 보존
+      - output_data:/app/output
+      # Docling·HuggingFace 모델 캐시 (재다운로드 방지)
+      - model_cache:/app/.cache
+      # NLTK 데이터 캐시
+      - nltk_data:/app/nltk_data
+    env_file:
+      - path: .env
+        required: false           # .env 없어도 실행 가능
+    environment:
+      - API_HOST=0.0.0.0
+      - API_PORT=8000
+      - PYTHONUNBUFFERED=1
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      start_period: 60s
+      retries: 3
+    deploy:
+      resources:
+        limits:
+          memory: 8G              # docling 모델 로딩에 충분한 메모리 확보
+        reservations:
+          memory: 2G
+
+  # ---------------------------------------------------------------------------
+  # Streamlit 웹 UI
+  # ---------------------------------------------------------------------------
+  ui:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: docmindai:latest
+    container_name: docmindai-ui
+    command: >
+      streamlit run app.py
+      --server.address 0.0.0.0
+      --server.port 8501
+      --server.headless true
+      --browser.gatherUsageStats false
+    ports:
+      - "${UI_PORT:-8501}:8501"
+    volumes:
+      - output_data:/app/output
+      - model_cache:/app/.cache
+      - nltk_data:/app/nltk_data
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      - PYTHONUNBUFFERED=1
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8501/_stcore/health"]
+      interval: 30s
+      timeout: 10s
+      start_period: 90s          # Streamlit 초기 로딩이 더 오래 걸림
+      retries: 3
+    deploy:
+      resources:
+        limits:
+          memory: 8G
+        reservations:
+          memory: 2G
+
+# =============================================================================
+# 볼륨 (named volumes — 컨테이너 재시작 후에도 데이터 유지)
+# =============================================================================
+volumes:
+  output_data:
+    driver: local
+  model_cache:
+    driver: local
+  nltk_data:
+    driver: local
