@@ -1,0 +1,26 @@
+{
+  "name": "docmindai-mcp-server",
+  "version": "1.0.0",
+  "description": "DocMindAI 문서 번역 API를 MCP 도구로 노출하는 서버",
+  "type": "module",
+  "main": "dist/index.js",
+  "bin": {
+    "docmindai-mcp-server": "dist/index.js"
+  },
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc --watch",
+    "start": "node dist/index.js",
+    "prepublishOnly": "npm run build"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.12.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "typescript": "^5.6.0"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}
