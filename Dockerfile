@@ -23,8 +23,11 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
         libssl-dev \
     && rm -rf /var/lib/apt/lists/*
 
-# hwpforge-bindings-cli 설치 (HWP/HWPX → Markdown 변환 CLI)
-RUN cargo install hwpforge-bindings-cli \
+# hwpforge-bindings-cli 설치 (crates.io 미등록 → GitHub 소스에서 직접 빌드)
+RUN cargo install \
+        --git https://github.com/ai-screams/HwpForge \
+        --bin hwpforge \
+        hwpforge-bindings-cli \
     && strip /usr/local/cargo/bin/hwpforge   # 바이너리 크기 최소화
 
 
