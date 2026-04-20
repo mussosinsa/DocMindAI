@@ -335,11 +335,10 @@ def process_hwp_file(
     """
     HWP/HWPX 파일 전용 처리 파이프라인입니다.
 
-    HWP(.hwp) 및 HWPX(.hwpx) 파일에서 텍스트를 추출하고,
-    번역 후 인터랙티브 HTML을 생성합니다.
-
-    - .hwpx: 표준 라이브러리(ZIP+XML)로 파싱 (추가 의존성 없음)
-    - .hwp:  pyhwp 라이브러리 필요 (pip install pyhwp)
+    파싱 전략 (우선순위):
+    1. HwpForge CLI — Markdown 변환 (구조·표·수식 보존, 최고 품질)
+    2. HWPX: 표준 라이브러리(ZIP+XML) 폴백
+    3. HWP:  pyhwp 라이브러리 폴백 (pip install pyhwp)
 
     Args:
         file_path: 처리할 HWP/HWPX 파일 경로
@@ -353,8 +352,11 @@ def process_hwp_file(
     Returns:
         결과 정보 딕셔너리 (output_dir, html_path)
     """
-    from src.hwp_parser import parse_hwp, parse_hwpx
-    from src.text_parser import TextSegment
+    from src.hwp_parser import (
+        is_hwpforge_available, parse_to_markdown,
+        parse_hwp, parse_hwpx,
+    )
+    from src.text_parser import TextFileParser, TextSegment
 
     ensure_nltk_resources()
 
@@ -378,44 +380,66 @@ def process_hwp_file(
     output_dir = Path("output") / f"{base_filename}_{source_lang}_to_{target_lang}_{timestamp}"
     output_dir.mkdir(parents=True, exist_ok=True)
 
-    logging.info(f"[{file_name}] HWP 파일 처리 시작 (엔진: {engine})")
+    use_hwpforge = is_hwpforge_available()
+    logging.info(
+        f"[{file_name}] HWP 파일 처리 시작 "
+        f"(엔진: {engine}, 파서: {'HwpForge' if use_hwpforge else 'fallback'})"
+    )
 
-    # 1. HWP/HWPX 파싱
+    # 1. 파싱
     if progress_cb:
         progress_cb(0.10, f"📝 문서 파싱 중... ({file_name})")
 
-    try:
-        if ext == '.hwpx':
-            paragraphs = parse_hwpx(file_path)
-        else:
-            paragraphs = parse_hwp(file_path)
-    except Exception as e:
-        logging.error(f"[{file_name}] HWP 파싱 오류: {e}", exc_info=True)
-        if progress_cb:
-            progress_cb(1.0, f"❌ HWP 파싱 오류: {e}")
-        return {}
+    segments: list
+    use_markdown = False
 
-    if not paragraphs:
-        logging.warning(f"[{file_name}] 추출된 텍스트가 없습니다.")
-        if progress_cb:
-            progress_cb(1.0, f"⚠️ 텍스트를 추출할 수 없습니다: {file_name}")
-        return {}
+    # 1-a. HwpForge → Markdown (고품질)
+    if use_hwpforge:
+        try:
+            md_content = parse_to_markdown(file_path)
+            if md_content:
+                parser = TextFileParser()
+                segments = parser._parse_markdown(md_content)
+                use_markdown = True
+                logging.info(
+                    f"[{file_name}] HwpForge 파싱 성공: "
+                    f"{len(segments)}개 세그먼트"
+                )
+        except Exception as e:
+            logging.warning(f"[{file_name}] HwpForge 파싱 실패, 폴백: {e}")
+            use_markdown = False
 
-    # 2. TextSegment 생성 (단락 단위)
-    segments = [
-        TextSegment(
-            text=para,
-            start_pos=i,
-            end_pos=i + 1,
-            translatable=True,
-            segment_type='prose',
-            line_number=i + 1
-        )
-        for i, para in enumerate(paragraphs)
-    ]
+    # 1-b. 폴백 파서
+    if not use_markdown:
+        try:
+            if ext == '.hwpx':
+                paragraphs = parse_hwpx(file_path)
+            else:
+                paragraphs = parse_hwp(file_path)
+        except Exception as e:
+            logging.error(f"[{file_name}] HWP 파싱 오류: {e}", exc_info=True)
+            if progress_cb:
+                progress_cb(1.0, f"❌ HWP 파싱 오류: {e}")
+            return {}
 
-    unique_texts = list(set(para for para in paragraphs))
-    logging.info(f"[{file_name}] 단락 {len(paragraphs)}개, 번역 대상 {len(unique_texts)}개")
+        if not paragraphs:
+            logging.warning(f"[{file_name}] 추출된 텍스트가 없습니다.")
+            if progress_cb:
+                progress_cb(1.0, f"⚠️ 텍스트를 추출할 수 없습니다: {file_name}")
+            return {}
+
+        segments = [
+            TextSegment(
+                text=para, start_pos=i, end_pos=i + 1,
+                translatable=True, segment_type='prose', line_number=i + 1,
+            )
+            for i, para in enumerate(paragraphs)
+        ]
+
+    # 2. 번역 대상 추출
+    translatable = [s.text for s in segments if s.translatable and s.text.strip()]
+    unique_texts = list(set(translatable))
+    logging.info(f"[{file_name}] 번역 대상 {len(unique_texts)}개 (고유 문장)")
 
     if progress_cb:
         progress_cb(0.20, msgs["translating_start"].format(count=len(unique_texts)))
@@ -438,7 +462,7 @@ def process_hwp_file(
         src=source_lang,
         dest=target_lang,
         max_workers=max_workers,
-        progress_cb=_translate_progress
+        progress_cb=_translate_progress,
     )
 
     t_trans_end = time.time()
@@ -451,7 +475,9 @@ def process_hwp_file(
     if progress_cb:
         progress_cb(0.85, msgs["saving"].format(file_name=file_name))
 
-    file_type = get_file_type_display(ext.lstrip('.'))
+    parser_label = "HwpForge" if use_hwpforge and use_markdown else "fallback"
+    raw_ext = ext.lstrip('.')
+    file_type = f"{get_file_type_display(raw_ext)} · {parser_label}"
 
     GEN_BASE = 0.85
     GEN_SPAN = 0.15
@@ -466,8 +492,8 @@ def process_hwp_file(
         segments=segments,
         translation_map=translation_map,
         file_type=file_type,
-        is_markdown=False,
-        progress_cb=_gen_progress
+        is_markdown=use_markdown,
+        progress_cb=_gen_progress,
     )
 
     path_html = output_dir / f"{base_filename}_interactive.html"
