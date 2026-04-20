@@ -8,7 +8,7 @@ openai>=2.8.0
 streamlit>=1.30.0
 watchdog>=3.0.0
 markdown>=3.5.0
-pyhwp>=0.6b12
+pyhwp>=0.1b1
 # REST API
 fastapi>=0.110.0
 uvicorn[standard]>=0.29.0
