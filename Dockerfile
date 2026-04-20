@@ -86,7 +86,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 # ---------------------------------------------------------------------------
 COPY requirements.txt .
 
+# CPU-only PyTorch — CUDA 라이브러리(~4 GB) 제외로 이미지 크기 대폭 절감
 RUN pip install --upgrade pip && \
+    pip install torch --index-url https://download.pytorch.org/whl/cpu && \
     pip install -r requirements.txt
 
 # ---------------------------------------------------------------------------
