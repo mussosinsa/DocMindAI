@@ -9,6 +9,10 @@ streamlit>=1.30.0
 watchdog>=3.0.0
 markdown>=3.5.0
 pyhwp>=0.6b12
+# REST API
+fastapi>=0.110.0
+uvicorn[standard]>=0.29.0
+python-multipart>=0.0.9
 # MinerU: 고품질 PDF 레이아웃 분석 (선택적)
 # pip install "mineru[all]"  — GPU 없이 CPU 모드도 지원
 # mineru[all]
