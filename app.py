@@ -467,12 +467,12 @@ def main():
                     st.info(t("single_tip"))
                     
                     # 뷰어 (전체 너비)
-                    # st.components.v1.html 은 2026-06-01 제거 예정 → st.iframe 사용
+                    # st.iframe: scrolling 파라미터 없음 — iframe 기본값(auto)으로 스크롤 동작
                     _src = (
                         "data:text/html;charset=utf-8;base64,"
                         + base64.b64encode(html_content.encode("utf-8")).decode("ascii")
                     )
-                    st.iframe(_src, height=900, scrolling=True)
+                    st.iframe(_src, height=900)
                     
                     # 폴더 열기 버튼
                     if st.button(t("open_folder"), key=f"open_{selected_idx}_{i}_focus"):
