@@ -25,7 +25,7 @@ TRANSLATIONS = {
         "uploader_limit": "Docs: PDF, DOCX, PPTX | Code: .py, .js, .ts, .java, .c, .go | Text: .md, .txt, .json",
 
         # 타이틀 / 사이드바
-        "app_title": "Docling PDF Translator",
+        "app_title": "DocMindAI Translator",
         "sidebar_header": "Settings",
         "upload_label": "Upload files (Documents, Code, Text)",
         "options_label": "Translation options",
@@ -96,7 +96,7 @@ TRANSLATIONS = {
         "uploader_limit": "문서: PDF, DOCX, PPTX | 코드: .py, .js, .ts, .java, .c, .go | 텍스트: .md, .txt, .json",
 
         # 타이틀 / 사이드바
-        "app_title": "Docling PDF 번역기",
+        "app_title": "DocMindAI 번역기",
         "sidebar_header": "설정",
         "upload_label": "파일 업로드 (문서, 코드, 텍스트)",
         "options_label": "번역 옵션",

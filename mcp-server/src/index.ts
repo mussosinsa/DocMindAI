@@ -206,19 +206,10 @@ const TOOLS: Tool[] = [
         },
         engine: {
           type: "string",
-          enum: [
-            "google",
-            "deepl",
-            "gemini",
-            "openai",
-            "nllb",
-            "nllb-koen",
-            "qwen-0.6b",
-            "lfm2",
-            "lfm2-koen-mt",
-            "yanolja",
-          ],
-          description: "번역 엔진",
+          description:
+            "번역 엔진. 내장: google, deepl, gemini, openai, nllb, nllb-koen, " +
+            "qwen-0.6b, lfm2, lfm2-koen-mt, yanolja. " +
+            "Ollama 로컬 LLM: 'ollama:<모델명>' (예: ollama:llama3.2)",
           default: "google",
         },
         max_workers: {

@@ -29,13 +29,14 @@ from src.core import process_document, create_converter
 from src.i18n import t, set_current_lang, get_current_lang
 from src.utils import inject_images, load_history_from_disk
 from src.mineru_parser import is_mineru_available
+from src.translation.engines.ollama import list_ollama_models, get_ollama_base_url
 
 # 로깅 설정
 logging.basicConfig(level=logging.INFO)
 
 # Streamlit 페이지 설정 (반드시 가장 먼저 호출)
 st.set_page_config(
-    page_title="Docling PDF Translator",
+    page_title="DocMindAI Translator",
     page_icon="🌐",
     layout="wide"
 )
@@ -101,9 +102,32 @@ def main():
         source_lang = st.selectbox(t("src_label"), ["en", "fr", "de", "es", "it", "ja", "zh", "ko"], index=0)
         target_lang = st.selectbox(t("dest_label"), ["ko", "en", "fr", "de", "es", "it", "ja", "zh"], index=0)
         
-        engine = st.selectbox(t("engine_label"), ["google", "deepl", "gemini", "openai", "qwen-0.6b", "lfm2", "lfm2-koen-mt", "nllb", "nllb-koen", "yanolja"], index=0)
-        
-        default_workers = 1 if engine in ["qwen-0.6b", "lfm2", "lfm2-koen-mt", "nllb", "nllb-koen", "yanolja"] else 8
+        # 내장 엔진 + Ollama 로컬 LLM 동적 조회
+        # Ollama 서버(http://localhost:11434) 미실행 시 빈 리스트 반환 → 내장 엔진만 표시
+        base_engines = [
+            "google", "deepl", "gemini", "openai",
+            "qwen-0.6b", "lfm2", "lfm2-koen-mt",
+            "nllb", "nllb-koen", "yanolja",
+        ]
+        ollama_models = list_ollama_models()
+        ollama_engines = [f"ollama:{m}" for m in ollama_models]
+        engine_options = base_engines + ollama_engines
+
+        engine = st.selectbox(
+            t("engine_label"),
+            engine_options,
+            index=0,
+            help=(
+                f"Ollama 로컬 LLM 모델 {len(ollama_models)}개 감지됨 ({get_ollama_base_url()})"
+                if ollama_models
+                else f"Ollama 서버 미연결 ({get_ollama_base_url()}) — 로컬 LLM을 사용하려면 `ollama serve` 실행 후 모델을 설치하세요."
+            ),
+        )
+
+        # 로컬 LLM(Ollama / Qwen / LFM2 / NLLB 등)은 GPU/CPU 리소스 공유이므로 워커 1 권장
+        local_llm_engines = {"qwen-0.6b", "lfm2", "lfm2-koen-mt", "nllb", "nllb-koen", "yanolja"}
+        is_local_llm = engine in local_llm_engines or engine.startswith("ollama:")
+        default_workers = 1 if is_local_llm else 8
         max_workers = st.number_input(
             t("workers_label"), 
             min_value=1, 

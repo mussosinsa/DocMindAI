@@ -148,7 +148,11 @@ async def create_translate_job(
     target_lang: str = Form("ko", description="번역 대상 언어 코드 (예: ko, en)"),
     engine: str = Form(
         "google",
-        description="번역 엔진 (google | deepl | gemini | openai | nllb | nllb-koen | qwen-0.6b | lfm2 | lfm2-koen-mt | yanolja)",
+        description=(
+            "번역 엔진. 내장: google | deepl | gemini | openai | nllb | nllb-koen | "
+            "qwen-0.6b | lfm2 | lfm2-koen-mt | yanolja. "
+            "Ollama 로컬 LLM: 'ollama:<모델명>' (예: ollama:llama3.2, ollama:qwen2.5:7b)"
+        ),
     ),
     max_workers: int = Form(4, ge=1, le=16, description="병렬 번역 워커 수"),
     speed_mode: Literal["balanced", "fast"] = Form(

@@ -19,20 +19,31 @@ from .engines.lfm2_koen import LFM2KOENTranslator
 from .engines.nllb import NLLBTranslator
 from .engines.nllb_koen import NLLBKOENTranslator
 from .engines.yanolja import YanoljaTranslator
+from .engines.ollama import OllamaTranslator
 
 def create_translator(engine_name: str) -> BaseTranslator:
     """
     지정된 이름의 번역 엔진 인스턴스를 생성하여 반환합니다.
-    
+
     Args:
-        engine_name (str): 번역 엔진 이름 ('google', 'deepl', 'gemini', 'openai', 'qwen', 'yanolja')
-        
+        engine_name (str): 번역 엔진 이름.
+            - 내장 엔진: 'google', 'deepl', 'gemini', 'openai', 'qwen-0.6b',
+                        'lfm2', 'lfm2-koen-mt', 'nllb', 'nllb-koen', 'yanolja'
+            - Ollama: 'ollama:<모델명>'  (예: 'ollama:llama3.2', 'ollama:qwen2.5:7b')
+
     Returns:
         BaseTranslator: 생성된 번역 엔진 인스턴스
-        
+
     Raises:
         ValueError: 지원하지 않는 엔진 이름일 경우 발생
     """
+    name = engine_name.strip()
+
+    # Ollama: "ollama:<model>" 형태 — 콜론 뒤 전체를 모델명으로 사용 (qwen2.5:7b 등 콜론 포함 가능)
+    if name.lower().startswith("ollama:"):
+        model = name[len("ollama:"):].strip()
+        return OllamaTranslator(model=model)
+
     engines = {
         "google": GoogleTranslator,
         "deepl": DeepLTranslator,
@@ -46,9 +57,9 @@ def create_translator(engine_name: str) -> BaseTranslator:
         "nllb-koen": NLLBKOENTranslator,
         "yanolja": YanoljaTranslator,
     }
-    
-    engine_class = engines.get(engine_name.lower())
+
+    engine_class = engines.get(name.lower())
     if not engine_class:
         raise ValueError(f"Unsupported engine: {engine_name}")
-    
+
     return engine_class()
