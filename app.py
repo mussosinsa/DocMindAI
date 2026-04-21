@@ -135,6 +135,9 @@ def main():
 
         # 현재 세션에서 사용할 Ollama URL
         _ollama_url = st.session_state["ollama_base_url"]
+        # OllamaTranslator 는 os.getenv("OLLAMA_BASE_URL") 을 참조하므로
+        # 세션에서 변경된 URL 을 env var 에 반영해 번역 시에도 올바른 서버로 연결
+        os.environ["OLLAMA_BASE_URL"] = _ollama_url
 
         # 번역 엔진: Ollama 모델만 표시
         ollama_models = list_ollama_models(base_url=_ollama_url)
