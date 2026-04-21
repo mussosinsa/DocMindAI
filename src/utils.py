@@ -161,12 +161,14 @@ def load_history_from_disk(output_dir: Path = Path("output")) -> list:
                 # HTML 파일 확인
                 html_path = entry / f"{filename}_interactive.html"
                 if html_path.exists():
+                    md_path = entry / f"{filename}_translated.md"
                     history.append({
                         "timestamp": display_time,
                         "results": [{
                             "filename": filename, # 원본 파일명 (확장자 제외된 stem일 수 있음)
                             "output_dir": str(entry),
-                            "html_path": str(html_path)
+                            "html_path": str(html_path),
+                            "md_path": str(md_path) if md_path.exists() else None,
                         }],
                         "source": src,
                         "target": dest,

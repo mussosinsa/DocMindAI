@@ -7,12 +7,13 @@ DocMindAI REST API 서버 (FastAPI 기반).
     uvicorn api:app --host 0.0.0.0 --port 8000 --reload
 
 API 엔드포인트:
-    POST   /api/v1/translate          문서 업로드 및 번역 잡 생성
-    GET    /api/v1/jobs/{job_id}      잡 상태 조회
-    GET    /api/v1/jobs/{job_id}/result  번역 결과 HTML 다운로드
-    GET    /api/v1/jobs               전체 잡 목록
-    DELETE /api/v1/jobs/{job_id}      잡 삭제
-    GET    /health                    헬스체크
+    POST   /api/v1/translate              문서 업로드 및 번역 잡 생성
+    GET    /api/v1/jobs/{job_id}          잡 상태 조회
+    GET    /api/v1/jobs/{job_id}/result    번역 결과 HTML 다운로드
+    GET    /api/v1/jobs/{job_id}/result.md 번역 결과 Markdown 다운로드
+    GET    /api/v1/jobs                   전체 잡 목록
+    DELETE /api/v1/jobs/{job_id}          잡 삭제
+    GET    /health                        헬스체크
 
 사용 예시:
     # 파일 업로드
@@ -306,6 +307,48 @@ async def download_result(job_id: str):
     return FileResponse(
         path=str(tmp_result),
         media_type="text/html",
+        filename=result_filename,
+        background=None,
+    )
+
+
+# ---------------------------------------------------------------------------
+# Markdown 결과 다운로드
+# ---------------------------------------------------------------------------
+@app.get(
+    "/api/v1/jobs/{job_id}/result.md",
+    tags=["Translation"],
+    summary="번역 결과 Markdown 다운로드",
+    response_class=FileResponse,
+)
+async def download_result_markdown(job_id: str):
+    """
+    완료된 잡의 번역 결과를 Markdown(.md) 파일로 반환합니다.
+    """
+    job = job_manager.get(job_id)
+    if not job:
+        raise HTTPException(status_code=404, detail="잡을 찾을 수 없습니다.")
+    if job.status in (JobStatus.PROCESSING, JobStatus.QUEUED):
+        raise HTTPException(status_code=202, detail="아직 처리 중입니다. 잠시 후 다시 시도하세요.")
+    if job.status == JobStatus.ERROR:
+        raise HTTPException(status_code=500, detail=f"처리 오류: {job.error}")
+
+    md_path: Optional[Path] = Path(job.md_path) if job.md_path else None
+
+    # 폴백: md_path가 비어있거나 파일이 없으면 HTML에서 추출
+    if not md_path or not md_path.exists():
+        from src.markdown_generator import markdown_from_html_file
+        if not job.result_path or not Path(job.result_path).exists():
+            raise HTTPException(status_code=404, detail="결과 파일이 존재하지 않습니다.")
+        md_text = markdown_from_html_file(Path(job.result_path))
+        tmp_md = Path(tempfile.mktemp(suffix=".md"))
+        tmp_md.write_text(md_text, encoding="utf-8")
+        md_path = tmp_md
+
+    result_filename = f"{Path(job.file_name).stem}_translated.md"
+    return FileResponse(
+        path=str(md_path),
+        media_type="text/markdown",
         filename=result_filename,
         background=None,
     )

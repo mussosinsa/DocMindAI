@@ -32,6 +32,7 @@ class Job:
     progress: float = 0.0
     message: str = "대기 중..."
     result_path: Optional[Path] = None   # 결과 HTML 파일 경로
+    md_path: Optional[Path] = None       # 번역 결과 Markdown 파일 경로
     output_dir: Optional[Path] = None    # 결과 디렉토리
     error: Optional[str] = None
     created_at: datetime = field(default_factory=datetime.utcnow)
@@ -117,6 +118,7 @@ class JobManager:
                     progress=1.0,
                     message="완료",
                     result_path=result.get("html_path"),
+                    md_path=result.get("md_path"),
                     output_dir=result.get("output_dir"),
                     finished_at=datetime.utcnow(),
                 )

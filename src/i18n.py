@@ -69,6 +69,7 @@ TRANSLATIONS = {
         "open_folder_primary": "📂 Open result folder",
         "open_folder_failed": "Failed to open the folder: {error}",
         "open_folder_success": "Opened folder: {path}",
+        "download_folder_hint": "Files are stored on the server at: {path}",
 
 
         # 단일 결과 영역
@@ -77,11 +78,12 @@ TRANSLATIONS = {
         "focus_mode_help": "Hide sidebar & controls for a wider view.",
         "view_mode_label": "👁️ Inspection Mode",
         "view_mode_help": "Show source and translation side-by-side.",
-        "download_options_label": "💾 Download & Actions",
+        "download_options_label": "💾 Downloads",
 
         # 다운로드 버튼 라벨
         "zip_download": "📦 Download ZIP",
         "html_download": "🌐 Download HTML",
+        "md_download": "📝 Download Markdown (.md)",
         "zip_download_all": "📦 Download all results (ZIP)",
         "html_download_interactive": "🌐 Download interactive HTML",
     },
@@ -140,6 +142,7 @@ TRANSLATIONS = {
         "open_folder_primary": "📂 결과 폴더 열기",
         "open_folder_failed": "폴더를 열 수 없습니다: {error}",
         "open_folder_success": "폴더를 열었습니다: {path}",
+        "download_folder_hint": "서버에 저장된 결과 경로: {path}",
 
 
         # 단일 결과 영역
@@ -148,11 +151,12 @@ TRANSLATIONS = {
         "focus_mode_help": "사이드바와 컨트롤을 숨기고 화면을 넓게 사용합니다.",
         "view_mode_label": "👁️ 검수 모드",
         "view_mode_help": "원문과 번역문을 좌우로 나란히 비교합니다.",
-        "download_options_label": "💾 다운로드 및 작업",
+        "download_options_label": "💾 다운로드",
 
         # 다운로드 버튼 라벨
         "zip_download": "📦 ZIP 다운로드",
         "html_download": "🌐 HTML 다운로드",
+        "md_download": "📝 Markdown(.md) 다운로드",
         "zip_download_all": "📦 전체 결과 다운로드 (ZIP)",
         "html_download_interactive": "🌐 인터랙티브 HTML 다운로드",
     },

@@ -64,6 +64,7 @@ except ImportError:
 from src.benchmark import global_benchmark as bench
 from src.translation import create_translator
 from src.html_generator import generate_html_content
+from src.markdown_generator import generate_docling_markdown, generate_text_markdown
 from src.utils import ensure_nltk_resources
 from src.text_parser import TextFileParser, is_text_file
 from src.text_html_generator import generate_text_html, get_file_type_display, generate_code_file_html
@@ -310,16 +311,25 @@ def process_text_file(
     path_html = output_dir / f"{base_filename}_interactive.html"
     with open(path_html, "w", encoding="utf-8") as f:
         f.write(html_content)
-    
+
+    # Markdown 저장 (코드 파일은 원본 구조 유지용으로만 생성)
+    md_content = generate_text_markdown(
+        segments, translation_map, is_markdown=is_markdown
+    )
+    path_md = output_dir / f"{base_filename}_translated.md"
+    with open(path_md, "w", encoding="utf-8") as f:
+        f.write(md_content)
+
     if progress_cb:
         progress_cb(1.0, msgs["done"].format(file_name=file_name))
-    
+
     bench.end(f"Total Process (Text): {file_name}")
     logging.info(f"[{file_name}] 텍스트 파일 처리 완료: {output_dir}")
-    
+
     return {
         "output_dir": output_dir,
-        "html_path": path_html
+        "html_path": path_html,
+        "md_path": path_md,
     }
 
 
@@ -500,6 +510,13 @@ def process_hwp_file(
     with open(path_html, "w", encoding="utf-8") as f:
         f.write(html_content)
 
+    md_content = generate_text_markdown(
+        segments, translation_map, is_markdown=use_markdown
+    )
+    path_md = output_dir / f"{base_filename}_translated.md"
+    with open(path_md, "w", encoding="utf-8") as f:
+        f.write(md_content)
+
     if progress_cb:
         progress_cb(1.0, msgs["done"].format(file_name=file_name))
 
@@ -508,7 +525,8 @@ def process_hwp_file(
 
     return {
         "output_dir": output_dir,
-        "html_path": path_html
+        "html_path": path_html,
+        "md_path": path_md,
     }
 
 
@@ -665,6 +683,13 @@ def process_single_file_with_mineru(
     with open(path_html, "w", encoding="utf-8") as f:
         f.write(html_content)
 
+    md_content = generate_text_markdown(
+        segments, translation_map, is_markdown=True
+    )
+    path_md = output_dir / f"{base_filename}_translated.md"
+    with open(path_md, "w", encoding="utf-8") as f:
+        f.write(md_content)
+
     if progress_cb:
         progress_cb(1.0, msgs["done"].format(file_name=file_name))
 
@@ -674,6 +699,7 @@ def process_single_file_with_mineru(
     return {
         "output_dir": output_dir,
         "html_path": path_html,
+        "md_path": path_md,
     }
 
 
@@ -891,17 +917,30 @@ def process_single_file(
 
     with open(path_html, "w", encoding="utf-8") as f:
         f.write(html_content)
-    
+
+    # Markdown 출력 (이미지/캡션/표는 HTML 생성 시 이미 저장됨 → 카운터만 새로 계산)
+    md_content = generate_docling_markdown(
+        doc,
+        doc_items,
+        translation_map,
+        output_dir,
+        base_filename,
+    )
+    path_md = output_dir / f"{base_filename}_translated.md"
+    with open(path_md, "w", encoding="utf-8") as f:
+        f.write(md_content)
+
     if progress_cb:
         progress_cb(1.0, msgs["done"].format(file_name=file_name))
-    
+
     bench.end(f"Translation & Save: {file_name}")
     bench.end(f"Total Process: {file_name}")
     logging.info(f"[{file_name}] 파일 생성 완료: {output_dir}")
-    
+
     return {
         "output_dir": output_dir,
-        "html_path": path_html
+        "html_path": path_html,
+        "md_path": path_md,
     }
 
 def process_document(

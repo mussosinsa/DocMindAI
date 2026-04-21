@@ -342,7 +342,8 @@ def main():
                         results.append({
                             "filename": uploaded_file.name,
                             "output_dir": str(result["output_dir"]),
-                            "html_path": str(result["html_path"])
+                            "html_path": str(result["html_path"]),
+                            "md_path": str(result["md_path"]) if result.get("md_path") else None,
                         })
                     
                     # 임시 파일 삭제
@@ -486,13 +487,44 @@ def main():
                     )
                     st.iframe(_src, height=900)
                     
-                    # 폴더 열기 버튼
-                    if st.button(t("open_folder"), key=f"open_{selected_idx}_{i}_focus"):
-                        try:
-                            os.startfile(output_dir)
-                            st.success(t("open_folder_success").format(path=output_dir))
-                        except Exception as e:
-                            st.error(t("open_folder_failed").format(error=e))
+                    # 다운로드 영역 (MD / HTML)
+                    st.markdown(f"**{t('download_options_label')}**")
+                    dl_col1, dl_col2 = st.columns(2)
+
+                    # 다운로드 파일명: 확장자 제거된 stem 사용
+                    name_stem = Path(res['filename']).stem
+
+                    # Markdown 다운로드
+                    md_path = Path(res.get("md_path") or (output_dir / f"{name_stem}_translated.md"))
+                    if not md_path.exists():
+                        # 구버전 결과(.md 미생성) → HTML에서 즉석 추출
+                        from src.markdown_generator import markdown_from_html_content
+                        md_bytes = markdown_from_html_content(html_content).encode("utf-8")
+                    else:
+                        md_bytes = md_path.read_bytes()
+
+                    with dl_col1:
+                        st.download_button(
+                            label=t("md_download"),
+                            data=md_bytes,
+                            file_name=f"{name_stem}_translated.md",
+                            mime="text/markdown",
+                            key=f"dl_md_{selected_idx}_{i}",
+                            use_container_width=True,
+                        )
+
+                    # HTML 다운로드 (이미지 포함된 인터랙티브 뷰어)
+                    with dl_col2:
+                        st.download_button(
+                            label=t("html_download"),
+                            data=html_content.encode("utf-8"),
+                            file_name=f"{name_stem}_interactive.html",
+                            mime="text/html",
+                            key=f"dl_html_{selected_idx}_{i}",
+                            use_container_width=True,
+                        )
+
+                    st.caption(t("download_folder_hint").format(path=output_dir))
 
 if __name__ == "__main__":
     main()
