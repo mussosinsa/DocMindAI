@@ -116,45 +116,47 @@ def main():
             _url_input = st.text_input(
                 "서버 URL",
                 value=st.session_state["ollama_base_url"],
-                placeholder="http://localhost:11434",
+                placeholder="http://host.docker.internal:11434",
                 key="ollama_url_field",
-                help="Ollama 서버 주소를 입력하세요. 변경 후 '연결 확인' 버튼을 누르면 모델 목록이 갱신됩니다.",
+                help="변경 후 '연결 확인' 버튼을 눌러야 모델 목록이 갱신됩니다.",
             )
-            _col_btn, _col_status = st.columns([2, 1])
-            with _col_btn:
-                if st.button("연결 확인 / 모델 새로고침", use_container_width=True):
-                    _new_url = _url_input.strip().rstrip("/") or DEFAULT_OLLAMA_URL
-                    st.session_state["ollama_base_url"] = _new_url
-                    st.rerun()
+            if st.button("연결 확인 / 모델 새로고침", use_container_width=True):
+                _new_url = _url_input.strip().rstrip("/") or DEFAULT_OLLAMA_URL
+                st.session_state["ollama_base_url"] = _new_url
+                st.rerun()
+
+            st.caption(
+                "**Docker 환경 연결 안 될 때:**\n"
+                "Ollama가 `127.0.0.1`에만 바인딩되어 있으면 컨테이너에서 도달 불가.\n"
+                "호스트에서 아래 명령으로 재시작하세요:\n"
+                "```\nOLLAMA_HOST=0.0.0.0 ollama serve\n```\n"
+                "서버 URL: `http://host.docker.internal:11434`"
+            )
 
         # 현재 세션에서 사용할 Ollama URL
         _ollama_url = st.session_state["ollama_base_url"]
 
-        # 내장 엔진 + Ollama 로컬 LLM 동적 조회
-        base_engines = [
-            "google", "deepl", "gemini", "openai",
-            "qwen-0.6b", "lfm2", "lfm2-koen-mt",
-            "nllb", "nllb-koen", "yanolja",
-        ]
+        # 번역 엔진: Ollama 모델만 표시
         ollama_models = list_ollama_models(base_url=_ollama_url)
-        ollama_engines = [f"ollama:{m}" for m in ollama_models]
-        engine_options = base_engines + ollama_engines
+        engine_options = [f"ollama:{m}" for m in ollama_models]
 
-        engine = st.selectbox(
-            t("engine_label"),
-            engine_options,
-            index=0,
-            help=(
-                f"Ollama {len(ollama_models)}개 모델 연결됨 ({_ollama_url})"
-                if ollama_models
-                else f"Ollama 서버 미연결 ({_ollama_url}) — `ollama serve` 실행 후 '연결 확인'을 누르세요."
-            ),
-        )
+        if engine_options:
+            engine = st.selectbox(
+                t("engine_label"),
+                engine_options,
+                index=0,
+                help=f"Ollama {len(ollama_models)}개 모델 ({_ollama_url})",
+            )
+        else:
+            st.error(
+                f"**Ollama 미연결** — `{_ollama_url}`\n\n"
+                "위 설정 패널에서 서버 URL을 확인하고 '연결 확인'을 누르세요.",
+                icon="🔴",
+            )
+            engine = "__ollama_disconnected__"
 
-        # 로컬 LLM(Ollama / Qwen / LFM2 / NLLB 등)은 GPU/CPU 리소스 공유이므로 워커 1 권장
-        local_llm_engines = {"qwen-0.6b", "lfm2", "lfm2-koen-mt", "nllb", "nllb-koen", "yanolja"}
-        is_local_llm = engine in local_llm_engines or engine.startswith("ollama:")
-        default_workers = 1 if is_local_llm else 8
+        # Ollama는 로컬 LLM이므로 워커 1 권장
+        default_workers = 1
         max_workers = st.number_input(
             t("workers_label"), 
             min_value=1, 
@@ -275,8 +277,15 @@ def main():
     )
 
     # 4. 번역 실행
+    _is_processing = st.session_state.get("is_processing", False)
+    _ollama_ready = engine != "__ollama_disconnected__"
     if uploaded_files:
-        if st.button(t("translate_button"), type="primary", disabled="is_processing" in st.session_state and st.session_state["is_processing"]):
+        if st.button(
+            t("translate_button"),
+            type="primary",
+            disabled=_is_processing or not _ollama_ready,
+            help=None if _ollama_ready else "Ollama 서버에 연결된 후 번역할 수 있습니다.",
+        ):
             st.session_state["is_processing"] = True
             st.rerun()
 
