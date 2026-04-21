@@ -95,11 +95,11 @@ class OllamaTranslator(BaseTranslator):
     실패 시 GoogleTranslator 로 자동 폴백합니다.
     """
 
-    def __init__(self, model: str):
+    def __init__(self, model: str, base_url: Optional[str] = None):
         if not model:
             raise ValueError("Ollama 모델명을 지정해야 합니다.")
         self.model = model
-        self.base_url = get_ollama_base_url()
+        self.base_url = (base_url or get_ollama_base_url()).rstrip("/")
         self.fallback_engine = GoogleTranslator()
 
     def translate(self, text: str, src: str, dest: str) -> str:

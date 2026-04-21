@@ -39,10 +39,21 @@ def create_translator(engine_name: str) -> BaseTranslator:
     """
     name = engine_name.strip()
 
-    # Ollama: "ollama:<model>" 형태 — 콜론 뒤 전체를 모델명으로 사용 (qwen2.5:7b 등 콜론 포함 가능)
+    # Ollama: "ollama:<model>" 또는 "ollama:<model>@<base_url>" 형태
+    #   예) ollama:llama3.2
+    #       ollama:qwen2.5:7b@http://192.168.1.10:11434
+    # 모델명에 콜론이 포함될 수 있으므로 '@' 로만 URL 구분
     if name.lower().startswith("ollama:"):
-        model = name[len("ollama:"):].strip()
-        return OllamaTranslator(model=model)
+        rest = name[len("ollama"):]          # ":model" 또는 ":model@url"
+        if "@http" in rest:
+            # 마지막 @http 위치 기준으로 분리 (URL 내 콜론 허용)
+            at_idx = rest.rfind("@http")
+            model = rest[1:at_idx].strip()   # 첫 ':' 제거
+            base_url: Optional[str] = rest[at_idx + 1:].strip()
+        else:
+            model = rest[1:].strip()
+            base_url = None
+        return OllamaTranslator(model=model, base_url=base_url)
 
     engines = {
         "google": GoogleTranslator,

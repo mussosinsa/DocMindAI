@@ -299,6 +299,24 @@ const TOOLS: Tool[] = [
     },
   },
   {
+    name: "docmind_list_engines",
+    description:
+      "사용 가능한 번역 엔진 목록을 반환합니다. " +
+      "내장 엔진(google, deepl, gemini 등)과 Ollama 로컬 LLM 모델을 함께 조회합니다. " +
+      "docmind_translate 의 engine 파라미터에 사용할 값을 확인할 때 호출하세요.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        ollama_base_url: {
+          type: "string",
+          description:
+            "조회할 Ollama 서버 URL (생략 시 서버 기본값 사용). " +
+            "예: http://192.168.1.10:11434",
+        },
+      },
+    },
+  },
+  {
     name: "docmind_list_jobs",
     description: "최근 번역 잡 목록을 조회합니다.",
     inputSchema: {
@@ -437,6 +455,37 @@ async function handleGetResult(args: {
   ].join("\n");
 }
 
+async function handleListEngines(args: { ollama_base_url?: string }): Promise<string> {
+  const qs = args.ollama_base_url
+    ? `?ollama_base_url=${encodeURIComponent(args.ollama_base_url)}`
+    : "";
+  const data = await apiGet<{
+    builtin: string[];
+    ollama: { base_url: string; available: boolean; models: string[] };
+  }>(`/api/v1/engines${qs}`);
+
+  const lines: string[] = [
+    "=== 내장 엔진 ===",
+    data.builtin.join(", "),
+    "",
+    `=== Ollama 로컬 LLM (${data.ollama.base_url}) ===`,
+  ];
+
+  if (data.ollama.available) {
+    lines.push(`${data.ollama.models.length}개 모델 감지됨:`);
+    lines.push(...data.ollama.models.map((m) => `  ${m}`));
+    lines.push("");
+    lines.push(
+      "사용 예: docmind_translate { engine: \"" + data.ollama.models[0] + "\", ... }"
+    );
+  } else {
+    lines.push("서버 미연결 — `ollama serve` 를 실행하고 모델을 설치하세요.");
+    lines.push("설치 예: ollama pull llama3.2");
+  }
+
+  return lines.join("\n");
+}
+
 async function handleListJobs(args: { limit?: number }): Promise<string> {
   const limit = Math.min(args.limit ?? 20, 50);
   const data = await apiGet<JobListResponse>(`/api/v1/jobs?limit=${limit}`);
@@ -506,6 +555,9 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         text = await handleGetResult(
           args as { job_id: string; output_path?: string }
         );
+        break;
+      case "docmind_list_engines":
+        text = await handleListEngines(args as { ollama_base_url?: string });
         break;
       case "docmind_list_jobs":
         text = await handleListJobs(args as { limit?: number });

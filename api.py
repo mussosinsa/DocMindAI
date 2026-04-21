@@ -47,6 +47,7 @@ from pydantic import BaseModel, Field
 
 from src.core import create_converter, process_document
 from src.job_manager import JobStatus, job_manager
+from src.translation.engines.ollama import get_ollama_base_url, list_ollama_models
 from src.utils import inject_images
 
 # ---------------------------------------------------------------------------
@@ -126,6 +127,42 @@ class HealthResponse(BaseModel):
 async def health():
     """서버 상태 확인."""
     return HealthResponse()
+
+
+# ---------------------------------------------------------------------------
+# 엔진 목록
+# ---------------------------------------------------------------------------
+BUILTIN_ENGINES = [
+    "google", "deepl", "gemini", "openai",
+    "qwen-0.6b", "lfm2", "lfm2-koen-mt",
+    "nllb", "nllb-koen", "yanolja",
+]
+
+
+@app.get(
+    "/api/v1/engines",
+    tags=["System"],
+    summary="사용 가능한 번역 엔진 목록 조회",
+    description=(
+        "내장 엔진 목록과 Ollama 로컬 LLM 모델 목록을 반환합니다.\n\n"
+        "Ollama 서버가 실행 중이면 `ollama.models` 배열에 모델이 채워집니다.\n"
+        "`ollama_base_url` 파라미터로 다른 서버를 일시적으로 조회할 수 있습니다."
+    ),
+)
+async def list_engines(
+    ollama_base_url: Optional[str] = None,
+):
+    """내장 엔진 + Ollama 로컬 LLM 모델 목록을 반환합니다."""
+    resolved_url = (ollama_base_url or get_ollama_base_url()).rstrip("/")
+    ollama_model_names = list_ollama_models(base_url=resolved_url)
+    return {
+        "builtin": BUILTIN_ENGINES,
+        "ollama": {
+            "base_url": resolved_url,
+            "available": len(ollama_model_names) > 0,
+            "models": [f"ollama:{m}" for m in ollama_model_names],
+        },
+    }
 
 
 # ---------------------------------------------------------------------------
