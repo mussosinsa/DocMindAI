@@ -47,6 +47,13 @@ services:
       - API_HOST=0.0.0.0
       - API_PORT=8000
       - PYTHONUNBUFFERED=1
+      # Docker 컨테이너 안에서 host.docker.internal 로 호스트 Ollama 연결
+      # Linux Docker Engine 은 extra_hosts 로 자동 추가됨
+      - OLLAMA_BASE_URL=${OLLAMA_BASE_URL:-http://host.docker.internal:11434}
+    # Linux Docker Engine: host.docker.internal → 호스트 IP 자동 매핑
+    # Docker Desktop(Mac/Windows)에서는 이미 내장 지원
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
@@ -87,6 +94,9 @@ services:
         required: false
     environment:
       - PYTHONUNBUFFERED=1
+      - OLLAMA_BASE_URL=${OLLAMA_BASE_URL:-http://host.docker.internal:11434}
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8501/_stcore/health"]

@@ -18,6 +18,7 @@ import torch
 torch.classes.__path__ = []
 
 import streamlit as st
+import base64
 import os
 import logging
 from pathlib import Path
@@ -466,7 +467,12 @@ def main():
                     st.info(t("single_tip"))
                     
                     # 뷰어 (전체 너비)
-                    st.components.v1.html(html_content, height=900, scrolling=True)
+                    # st.components.v1.html 은 2026-06-01 제거 예정 → st.iframe 사용
+                    _src = (
+                        "data:text/html;charset=utf-8;base64,"
+                        + base64.b64encode(html_content.encode("utf-8")).decode("ascii")
+                    )
+                    st.iframe(_src, height=900, scrolling=True)
                     
                     # 폴더 열기 버튼
                     if st.button(t("open_folder"), key=f"open_{selected_idx}_{i}_focus"):
