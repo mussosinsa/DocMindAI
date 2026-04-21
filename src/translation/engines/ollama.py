@@ -21,7 +21,7 @@ import logging
 import os
 import urllib.error
 import urllib.request
-from typing import List
+from typing import List, Optional
 
 from ..base import BaseTranslator
 from ..utils import LANGUAGE_NAMES
@@ -40,14 +40,22 @@ def get_ollama_base_url() -> str:
     return os.getenv("OLLAMA_BASE_URL", DEFAULT_OLLAMA_URL).rstrip("/")
 
 
-def list_ollama_models(timeout: float = 2.0) -> List[str]:
+def list_ollama_models(
+    timeout: float = 2.0,
+    base_url: Optional[str] = None,
+) -> List[str]:
     """
     Ollama 서버에서 설치된 모델명 리스트를 조회합니다.
+
+    Args:
+        timeout:  연결 타임아웃 (초)
+        base_url: 서버 URL. None 이면 get_ollama_base_url() 값을 사용합니다.
 
     서버 미실행·연결 실패 시 빈 리스트를 반환합니다 (예외는 발생시키지 않음).
     최근 수정된 모델이 먼저 오도록 정렬합니다.
     """
-    url = f"{get_ollama_base_url()}/api/tags"
+    resolved = (base_url or get_ollama_base_url()).rstrip("/")
+    url = f"{resolved}/api/tags"
     try:
         with urllib.request.urlopen(url, timeout=timeout) as resp:
             data = json.loads(resp.read().decode("utf-8"))
@@ -62,9 +70,10 @@ def list_ollama_models(timeout: float = 2.0) -> List[str]:
         return []
 
 
-def is_ollama_available() -> bool:
+def is_ollama_available(base_url: Optional[str] = None) -> bool:
     """Ollama 서버 가용성 확인."""
-    url = f"{get_ollama_base_url()}/api/tags"
+    resolved = (base_url or get_ollama_base_url()).rstrip("/")
+    url = f"{resolved}/api/tags"
     try:
         with urllib.request.urlopen(url, timeout=1.5) as resp:
             return resp.status == 200

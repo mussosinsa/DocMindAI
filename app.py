@@ -29,7 +29,11 @@ from src.core import process_document, create_converter
 from src.i18n import t, set_current_lang, get_current_lang
 from src.utils import inject_images, load_history_from_disk
 from src.mineru_parser import is_mineru_available
-from src.translation.engines.ollama import list_ollama_models, get_ollama_base_url
+from src.translation.engines.ollama import (
+    DEFAULT_OLLAMA_URL,
+    get_ollama_base_url,
+    list_ollama_models,
+)
 
 # 로깅 설정
 logging.basicConfig(level=logging.INFO)
@@ -59,6 +63,10 @@ def main():
     if "history" not in st.session_state:
         # 앱 시작 시 디스크에서 히스토리 로드
         st.session_state.history = load_history_from_disk()
+
+    # Ollama 서버 URL: 환경 변수 → 세션 상태 우선 순위
+    if "ollama_base_url" not in st.session_state:
+        st.session_state["ollama_base_url"] = get_ollama_base_url()
 
     # 언어 변경 콜백
     def set_lang_and_rerun():
@@ -102,14 +110,32 @@ def main():
         source_lang = st.selectbox(t("src_label"), ["en", "fr", "de", "es", "it", "ja", "zh", "ko"], index=0)
         target_lang = st.selectbox(t("dest_label"), ["ko", "en", "fr", "de", "es", "it", "ja", "zh"], index=0)
         
+        # --- Ollama 서버 설정 ---
+        with st.expander("🦙 Ollama 서버 설정", expanded=False):
+            _url_input = st.text_input(
+                "서버 URL",
+                value=st.session_state["ollama_base_url"],
+                placeholder="http://localhost:11434",
+                key="ollama_url_field",
+                help="Ollama 서버 주소를 입력하세요. 변경 후 '연결 확인' 버튼을 누르면 모델 목록이 갱신됩니다.",
+            )
+            _col_btn, _col_status = st.columns([2, 1])
+            with _col_btn:
+                if st.button("연결 확인 / 모델 새로고침", use_container_width=True):
+                    _new_url = _url_input.strip().rstrip("/") or DEFAULT_OLLAMA_URL
+                    st.session_state["ollama_base_url"] = _new_url
+                    st.rerun()
+
+        # 현재 세션에서 사용할 Ollama URL
+        _ollama_url = st.session_state["ollama_base_url"]
+
         # 내장 엔진 + Ollama 로컬 LLM 동적 조회
-        # Ollama 서버(http://localhost:11434) 미실행 시 빈 리스트 반환 → 내장 엔진만 표시
         base_engines = [
             "google", "deepl", "gemini", "openai",
             "qwen-0.6b", "lfm2", "lfm2-koen-mt",
             "nllb", "nllb-koen", "yanolja",
         ]
-        ollama_models = list_ollama_models()
+        ollama_models = list_ollama_models(base_url=_ollama_url)
         ollama_engines = [f"ollama:{m}" for m in ollama_models]
         engine_options = base_engines + ollama_engines
 
@@ -118,9 +144,9 @@ def main():
             engine_options,
             index=0,
             help=(
-                f"Ollama 로컬 LLM 모델 {len(ollama_models)}개 감지됨 ({get_ollama_base_url()})"
+                f"Ollama {len(ollama_models)}개 모델 연결됨 ({_ollama_url})"
                 if ollama_models
-                else f"Ollama 서버 미연결 ({get_ollama_base_url()}) — 로컬 LLM을 사용하려면 `ollama serve` 실행 후 모델을 설치하세요."
+                else f"Ollama 서버 미연결 ({_ollama_url}) — `ollama serve` 실행 후 '연결 확인'을 누르세요."
             ),
         )
 
