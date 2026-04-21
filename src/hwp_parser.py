@@ -98,14 +98,14 @@ def _hwpx_to_markdown(file_path: str, work: Path) -> str:
     stem = Path(file_path).stem
     md_out = work / f"{stem}.md"
 
-    # -o 플래그로 파일 출력 시도
-    r = _run(['hwpforge', 'to-md', str(file_path), '-o', str(md_out)])
+    # --output <OUTPUT> <INPUT> 형식 (HwpForge CLI 규격)
+    r = _run(['hwpforge', 'to-md', '--output', str(md_out), str(file_path)])
     if r.returncode == 0 and md_out.exists():
         content = md_out.read_text(encoding='utf-8')
         if content.strip():
             return content
 
-    # stdout 출력 시도 (-o 미지원 버전 대비)
+    # stdout 출력 시도 (--output 미지원 구버전 대비)
     r = _run(['hwpforge', 'to-md', str(file_path)])
     if r.returncode == 0 and r.stdout.strip():
         return r.stdout
@@ -120,21 +120,18 @@ def _hwp5_to_markdown(file_path: str, work: Path) -> str:
     stem = Path(file_path).stem
     hwpx_out = work / f"{stem}.hwpx"
 
-    # HWP5 → HWPX (-o 플래그 우선, 미지원 시 cwd 방식)
-    for cmd in [
-        ['hwpforge', 'convert-hwp5', str(file_path), '-o', str(hwpx_out)],
-        ['hwpforge', 'convert-hwp5', str(file_path)],
-    ]:
-        r = _run(cmd, cwd=str(work))
-        if r.returncode == 0:
-            break
-    else:
+    # --output <OUTPUT> <INPUT> 형식 (HwpForge CLI 규격, --output 필수)
+    r = _run(
+        ['hwpforge', 'convert-hwp5', '--output', str(hwpx_out), str(file_path)],
+        cwd=str(work),
+    )
+    if r.returncode != 0:
         raise RuntimeError(
             f"hwpforge convert-hwp5 실패 (rc={r.returncode}): "
             f"{r.stderr.strip()[:200]}"
         )
 
-    # convert-hwp5 가 -o 없이 work 에 생성한 경우 탐색
+    # 출력 파일 탐색 (경로 불일치 대비)
     if not hwpx_out.exists():
         candidates = sorted(work.glob("*.hwpx"))
         if not candidates:
