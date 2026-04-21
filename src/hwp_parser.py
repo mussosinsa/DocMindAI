@@ -65,6 +65,8 @@ def parse_to_markdown(file_path: str) -> Optional[str]:
     if not is_hwpforge_available():
         return None
 
+    # cwd 를 임시 디렉토리로 변경하므로 상대 경로는 파일을 찾지 못함 → 절대 경로로 변환
+    file_path = str(Path(file_path).resolve())
     ext = Path(file_path).suffix.lower()
     with tempfile.TemporaryDirectory(prefix='hwpforge_') as tmp:
         work = Path(tmp)
