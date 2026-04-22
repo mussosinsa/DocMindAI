@@ -663,9 +663,9 @@ def main():
                     )
                     st.iframe(_src, height=900)
                     
-                    # 다운로드 영역 (MD / HTML)
+                    # 다운로드 영역 (MD / HTML / RAG JSON)
                     st.markdown(f"**{t('download_options_label')}**")
-                    dl_col1, dl_col2 = st.columns(2)
+                    dl_col1, dl_col2, dl_col3 = st.columns(3)
 
                     # 다운로드 파일명: 확장자 제거된 stem 사용
                     name_stem = Path(res['filename']).stem
@@ -685,7 +685,7 @@ def main():
                             data=md_bytes,
                             file_name=f"{name_stem}_translated.md",
                             mime="text/markdown",
-                            key=f"dl_md_{selected_idx}_{i}",
+                            key=f"dl_md_{view_idx}_{i}",
                             use_container_width=True,
                         )
 
@@ -696,9 +696,22 @@ def main():
                             data=html_content.encode("utf-8"),
                             file_name=f"{name_stem}_interactive.html",
                             mime="text/html",
-                            key=f"dl_html_{selected_idx}_{i}",
+                            key=f"dl_html_{view_idx}_{i}",
                             use_container_width=True,
                         )
+
+                    # RAG JSON 다운로드
+                    json_path = Path(res.get("json_path") or (output_dir / f"{name_stem}_rag.json"))
+                    if json_path.exists():
+                        with dl_col3:
+                            st.download_button(
+                                label=t("json_download"),
+                                data=json_path.read_bytes(),
+                                file_name=f"{name_stem}_rag.json",
+                                mime="application/json",
+                                key=f"dl_json_{view_idx}_{i}",
+                                use_container_width=True,
+                            )
 
                     st.caption(t("download_folder_hint").format(path=output_dir))
 
@@ -718,7 +731,7 @@ def main():
                             _doc_name_input = st.text_input(
                                 t("dify_doc_name_label"),
                                 value=_doc_name_default,
-                                key=f"dify_docname_{selected_idx}_{i}",
+                                key=f"dify_docname_{view_idx}_{i}",
                                 label_visibility="collapsed",
                             )
                         with _dify_col2:
@@ -726,12 +739,12 @@ def main():
                                 t("dify_indexing_label"),
                                 options=["high_quality", "economy"],
                                 format_func=lambda x: t(f"dify_indexing_{x.split('_')[0]}"),
-                                key=f"dify_idx_{selected_idx}_{i}",
+                                key=f"dify_idx_{view_idx}_{i}",
                                 label_visibility="collapsed",
                             )
                         if st.button(
                             t("dify_save_button"),
-                            key=f"dify_save_{selected_idx}_{i}",
+                            key=f"dify_save_{view_idx}_{i}",
                             use_container_width=True,
                         ):
                             _save_content = md_bytes.decode("utf-8")

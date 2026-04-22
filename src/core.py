@@ -12,6 +12,7 @@ src/core.py
 """
 
 import os
+import json
 import time
 import logging
 import nltk
@@ -320,6 +321,21 @@ def process_text_file(
     with open(path_md, "w", encoding="utf-8") as f:
         f.write(md_content)
 
+    # RAG JSON 저장
+    from src.rag_json_generator import generate_text_rag_json
+    rag_data = generate_text_rag_json(
+        segments=segments,
+        translation_map=translation_map,
+        filename=file_name,
+        source_lang=source_lang,
+        target_lang=target_lang,
+        timestamp=datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+        is_markdown=is_markdown,
+    )
+    path_json = output_dir / f"{base_filename}_rag.json"
+    with open(path_json, "w", encoding="utf-8") as f:
+        json.dump(rag_data, f, ensure_ascii=False, indent=2)
+
     if progress_cb:
         progress_cb(1.0, msgs["done"].format(file_name=file_name))
 
@@ -330,6 +346,7 @@ def process_text_file(
         "output_dir": output_dir,
         "html_path": path_html,
         "md_path": path_md,
+        "json_path": path_json,
     }
 
 
@@ -537,6 +554,21 @@ def process_hwp_file(
     with open(path_md, "w", encoding="utf-8") as f:
         f.write(md_content)
 
+    # RAG JSON 저장
+    from src.rag_json_generator import generate_text_rag_json
+    rag_data = generate_text_rag_json(
+        segments=segments,
+        translation_map=translation_map,
+        filename=file_name,
+        source_lang=source_lang,
+        target_lang=target_lang,
+        timestamp=datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+        is_markdown=use_markdown,
+    )
+    path_json = output_dir / f"{base_filename}_rag.json"
+    with open(path_json, "w", encoding="utf-8") as f:
+        json.dump(rag_data, f, ensure_ascii=False, indent=2)
+
     if progress_cb:
         progress_cb(1.0, msgs["done"].format(file_name=file_name))
 
@@ -547,6 +579,7 @@ def process_hwp_file(
         "output_dir": output_dir,
         "html_path": path_html,
         "md_path": path_md,
+        "json_path": path_json,
     }
 
 
@@ -710,6 +743,21 @@ def process_single_file_with_mineru(
     with open(path_md, "w", encoding="utf-8") as f:
         f.write(md_content)
 
+    # RAG JSON 저장
+    from src.rag_json_generator import generate_text_rag_json
+    rag_data = generate_text_rag_json(
+        segments=segments,
+        translation_map=translation_map,
+        filename=file_name,
+        source_lang=source_lang,
+        target_lang=target_lang,
+        timestamp=datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+        is_markdown=True,
+    )
+    path_json = output_dir / f"{base_filename}_rag.json"
+    with open(path_json, "w", encoding="utf-8") as f:
+        json.dump(rag_data, f, ensure_ascii=False, indent=2)
+
     if progress_cb:
         progress_cb(1.0, msgs["done"].format(file_name=file_name))
 
@@ -720,6 +768,7 @@ def process_single_file_with_mineru(
         "output_dir": output_dir,
         "html_path": path_html,
         "md_path": path_md,
+        "json_path": path_json,
     }
 
 
@@ -950,6 +999,21 @@ def process_single_file(
     with open(path_md, "w", encoding="utf-8") as f:
         f.write(md_content)
 
+    # RAG JSON 저장
+    from src.rag_json_generator import generate_docling_rag_json
+    rag_data = generate_docling_rag_json(
+        doc=doc,
+        doc_items=doc_items,
+        translation_map=translation_map,
+        filename=file_name,
+        source_lang=source_lang,
+        target_lang=target_lang,
+        timestamp=datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+    )
+    path_json = output_dir / f"{base_filename}_rag.json"
+    with open(path_json, "w", encoding="utf-8") as f:
+        json.dump(rag_data, f, ensure_ascii=False, indent=2)
+
     if progress_cb:
         progress_cb(1.0, msgs["done"].format(file_name=file_name))
 
@@ -961,6 +1025,7 @@ def process_single_file(
         "output_dir": output_dir,
         "html_path": path_html,
         "md_path": path_md,
+        "json_path": path_json,
     }
 
 def process_document(

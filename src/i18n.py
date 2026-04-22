@@ -85,6 +85,7 @@ TRANSLATIONS = {
         "zip_download": "📦 Download ZIP",
         "html_download": "🌐 Download HTML",
         "md_download": "📝 Download Markdown (.md)",
+        "json_download": "📊 Download RAG JSON",
         "zip_download_all": "📦 Download all results (ZIP)",
         "html_download_interactive": "🌐 Download interactive HTML",
 
@@ -184,6 +185,7 @@ TRANSLATIONS = {
         "zip_download": "📦 ZIP 다운로드",
         "html_download": "🌐 HTML 다운로드",
         "md_download": "📝 Markdown(.md) 다운로드",
+        "json_download": "📊 RAG JSON 다운로드",
         "zip_download_all": "📦 전체 결과 다운로드 (ZIP)",
         "html_download_interactive": "🌐 인터랙티브 HTML 다운로드",
 
