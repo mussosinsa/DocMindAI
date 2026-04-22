@@ -162,13 +162,14 @@ HTML_HEADER = """
         
         /* --- Document Structure --- */
         .page-marker {
-            border-bottom: 2px solid var(--border-color);
+            border-bottom: 1px solid var(--border-color);
             color: var(--sub-text-color);
-            margin: 40px 0 20px;
-            padding-bottom: 5px;
-            font-size: 0.85em;
+            margin: 30px 0 15px;
+            padding-bottom: 4px;
+            font-size: 0.8em;
             text-align: right;
-            font-weight: bold;
+            font-weight: normal;
+            opacity: 0.6;
         }
         
         .doc-header {
@@ -237,7 +238,6 @@ HTML_HEADER = """
             gap: 20px;
             margin-bottom: 30px;
             padding-bottom: 20px;
-            border-bottom: 1px dashed var(--border-color);
         }
         
         .view-mode-inspect .src-block { 
