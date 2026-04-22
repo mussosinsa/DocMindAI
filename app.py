@@ -66,6 +66,10 @@ def main():
         # 앱 시작 시 디스크에서 히스토리 로드
         st.session_state.history = load_history_from_disk()
 
+    # 결과 표시 인덱스: None이면 결과 숨김, 정수면 해당 기록 표시
+    if "history_show_idx" not in st.session_state:
+        st.session_state["history_show_idx"] = None
+
     # Ollama 서버 URL: 환경 변수 → 세션 상태 우선 순위
     if "ollama_base_url" not in st.session_state:
         st.session_state["ollama_base_url"] = get_ollama_base_url()
@@ -543,6 +547,7 @@ def main():
                     "engine": engine
                 }
                 st.session_state.history.insert(0, new_history_item)
+                st.session_state["history_show_idx"] = 0
                 st.info(t("batch_hint"))
 
                 # Dify 자동 저장
@@ -578,7 +583,7 @@ def main():
     # 5. 히스토리 및 결과 표시 영역
     if st.session_state.history:
         st.header(t("history_header"))
-        
+
         # 히스토리 선택 옵션 포맷팅
         def format_history_option(h):
             files = [r['filename'] for r in h['results']]
@@ -589,16 +594,24 @@ def main():
             return f"[{h['timestamp']}] {file_str} ({h['source']}->{h['target']})"
 
         history_options = [format_history_option(h) for h in st.session_state.history]
-        
-        selected_idx = st.selectbox(
-            t("history_select_label"),
-            range(len(history_options)),
-            format_func=lambda i: history_options[i],
-            placeholder=t("history_placeholder")
-        )
-        
-        if selected_idx is not None:
-            selected_record = st.session_state.history[selected_idx]
+
+        _sel_col, _btn_col = st.columns([4, 1])
+        with _sel_col:
+            selected_idx = st.selectbox(
+                t("history_select_label"),
+                range(len(history_options)),
+                format_func=lambda i: history_options[i],
+                placeholder=t("history_placeholder"),
+                label_visibility="collapsed",
+            )
+        with _btn_col:
+            if st.button(t("history_view_button"), use_container_width=True):
+                st.session_state["history_show_idx"] = selected_idx
+
+        # 결과는 버튼을 클릭한 후에만 표시
+        view_idx = st.session_state.get("history_show_idx")
+        if view_idx is not None and view_idx < len(st.session_state.history):
+            selected_record = st.session_state.history[view_idx]
             
             st.subheader(t("batch_result_header").format(n=len(selected_record['results'])))
             

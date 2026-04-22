@@ -25,10 +25,10 @@ TRANSLATIONS = {
         "uploader_limit": "Docs: PDF, DOCX, PPTX | Code: .py, .js, .ts, .java, .c, .go | Text: .md, .txt, .json",
 
         # 타이틀 / 사이드바
-        "app_title": "DocMindAI Translator",
+        "app_title": "DocMindAI Extractor",
         "sidebar_header": "Settings",
         "upload_label": "Upload files (Documents, Code, Text)",
-        "options_label": "Translation options",
+        "options_label": "Extraction options",
         "src_label": "Source language",
         "dest_label": "Target language",
         "engine_label": "Translation engine",
@@ -38,18 +38,19 @@ TRANSLATIONS = {
         "speed_mode_fast": "⚡ Fast",
         "speed_mode_balanced": "⚖️ Balanced",
         "speed_mode_help": "Fast: Faster processing, slightly lower quality. Balanced: Best quality (default).",
-        "translate_button": "Start new translation",
-        "stop_button": "Stop current translation",
-        "history_header": "Translation history",
+        "translate_button": "Start new extraction",
+        "stop_button": "Stop current extraction",
+        "history_header": "Extraction history",
         "history_select_label": "Select previous result",
         "history_placeholder": "Select a record...",
+        "history_view_button": "📋 View extraction result",
 
         # 진행 상태 / 배치 결과
         "status_processing": "[{current}/{total}] Processing: {filename}...",
         "status_all_done": "All tasks have been completed!",
-        "batch_success": "Successfully translated {n} file(s)!",
+        "batch_success": "Successfully extracted {n} file(s)!",
         "batch_hint": "👇 You can check the results for each file below.",
-        "batch_result_header": "📦 Batch translation results ({n} file(s))",
+        "batch_result_header": "📦 Batch extraction results ({n} file(s))",
 
         # 번역 중 에러
         "translate_error": "An error occurred while processing {filename}: {error}",
@@ -123,10 +124,10 @@ TRANSLATIONS = {
         "uploader_limit": "문서: PDF, DOCX, PPTX | 코드: .py, .js, .ts, .java, .c, .go | 텍스트: .md, .txt, .json",
 
         # 타이틀 / 사이드바
-        "app_title": "DocMindAI 번역기",
+        "app_title": "DocMindAI 추출기",
         "sidebar_header": "설정",
         "upload_label": "파일 업로드 (문서, 코드, 텍스트)",
-        "options_label": "번역 옵션",
+        "options_label": "추출 옵션",
         "src_label": "원본 언어 (Source)",
         "dest_label": "대상 언어 (Target)",
         "engine_label": "번역 엔진",
@@ -136,18 +137,19 @@ TRANSLATIONS = {
         "speed_mode_fast": "⚡ 빠른 모드",
         "speed_mode_balanced": "⚖️ 균형 모드",
         "speed_mode_help": "빠른 모드: 처리 속도 우선, 품질 약간 하락. 균형 모드: 최고 품질 (기본값).",
-        "translate_button": "새로 번역 시작",
-        "stop_button": "진행 중인 번역 중지",
-        "history_header": "번역 기록",
-        "history_select_label": "이전 번역 결과 선택",
+        "translate_button": "새로 추출 시작",
+        "stop_button": "진행 중인 추출 중지",
+        "history_header": "추출 기록",
+        "history_select_label": "이전 추출 결과 선택",
         "history_placeholder": "기록을 선택하세요...",
+        "history_view_button": "📋 추출기록 보기",
 
         # 진행 상태 / 배치 결과
         "status_processing": "[{current}/{total}] 처리 중: {filename}...",
         "status_all_done": "모든 작업이 완료되었습니다!",
-        "batch_success": "총 {n}개의 파일 번역이 완료되었습니다!",
+        "batch_success": "총 {n}개의 파일 추출이 완료되었습니다!",
         "batch_hint": "👇 아래에서 각 파일의 결과를 확인할 수 있습니다.",
-        "batch_result_header": "📦 배치 번역 결과 ({n}개 파일)",
+        "batch_result_header": "📦 배치 추출 결과 ({n}개 파일)",
 
         # 번역 중 에러
         "translate_error": "오류가 발생했습니다 ({filename}): {error}",
