@@ -105,7 +105,7 @@ class DifyClient:
         사용 가능한 지식 베이스(데이터셋) 목록을 반환합니다.
 
         Returns:
-            [{"id": "...", "name": "..."}, ...]
+            [{"id", "name", "description", "document_count", "word_count"}, ...]
         """
         datasets: list[dict] = []
         current_page = page
@@ -120,10 +120,14 @@ class DifyClient:
                 resp.raise_for_status()
                 data = resp.json()
                 items = data.get("data", [])
-                datasets.extend(
-                    {"id": item["id"], "name": item.get("name", item["id"])}
-                    for item in items
-                )
+                for item in items:
+                    datasets.append({
+                        "id":             item["id"],
+                        "name":           item.get("name", item["id"]),
+                        "description":    item.get("description", ""),
+                        "document_count": item.get("document_count", 0),
+                        "word_count":     item.get("word_count", 0),
+                    })
                 if not data.get("has_more"):
                     break
                 current_page += 1

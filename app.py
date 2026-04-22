@@ -35,7 +35,7 @@ from src.translation.engines.ollama import (
     get_ollama_base_url,
     list_ollama_models,
 )
-from src.dify_client import save_to_dify
+from src.dify_client import save_to_dify, list_dify_datasets
 
 # 로깅 설정
 logging.basicConfig(level=logging.INFO)
@@ -230,16 +230,34 @@ def main():
         _dify_init_ds  = os.getenv("DIFY_DATASET_ID", "")
 
         for _k, _v in [
-            ("dify_api_url",    _dify_init_url),
-            ("dify_api_key",    _dify_init_key),
-            ("dify_dataset_id", _dify_init_ds),
-            ("dify_datasets",   []),
-            ("dify_auto_save",  False),
+            ("dify_api_url",       _dify_init_url),
+            ("dify_api_key",       _dify_init_key),
+            ("dify_dataset_id",    _dify_init_ds),
+            ("dify_datasets",      []),
+            ("dify_auto_save",     False),
+            ("dify_connect_error", ""),
         ]:
             if _k not in st.session_state:
                 st.session_state[_k] = _v
 
+        # API 키가 설정돼 있고 목록이 비어있으면 자동 로드 (앱 최초 진입 시)
+        if (
+            st.session_state["dify_api_key"]
+            and not st.session_state["dify_datasets"]
+            and not st.session_state["dify_connect_error"]
+        ):
+            _ds_auto, _err_auto = list_dify_datasets(
+                st.session_state["dify_api_key"],
+                st.session_state["dify_api_url"],
+                timeout=5.0,
+            )
+            if not _err_auto:
+                st.session_state["dify_datasets"] = _ds_auto
+            else:
+                st.session_state["dify_connect_error"] = _err_auto
+
         with st.expander(t("dify_section_label"), expanded=bool(st.session_state["dify_api_key"])):
+            # ── 연결 설정 ──────────────────────────────────
             st.text_input(
                 t("dify_api_url_label"),
                 value=st.session_state["dify_api_url"],
@@ -255,52 +273,93 @@ def main():
                 key="dify_api_key_field",
             )
 
-            if st.button(t("dify_connect_button"), use_container_width=True, key="dify_connect_btn"):
+            _btn_col1, _btn_col2 = st.columns([3, 1])
+            with _btn_col1:
+                _do_connect = st.button(
+                    t("dify_connect_button"),
+                    use_container_width=True,
+                    key="dify_connect_btn",
+                )
+            with _btn_col2:
+                _do_refresh = st.button(
+                    "🔄",
+                    use_container_width=True,
+                    key="dify_refresh_btn",
+                    help=t("dify_refresh_help"),
+                    disabled=not st.session_state.get("dify_api_key"),
+                )
+
+            if _do_connect:
                 _new_url = st.session_state["dify_api_url_field"].strip().rstrip("/") or _dify_init_url
                 _new_key = st.session_state["dify_api_key_field"].strip()
                 st.session_state["dify_api_url"] = _new_url
                 st.session_state["dify_api_key"] = _new_key
+                st.session_state["dify_connect_error"] = ""
+                st.session_state["dify_datasets"] = []
 
                 if _new_key:
                     with st.spinner(t("dify_connecting")):
-                        from src.dify_client import list_dify_datasets
                         _ds_list, _ds_err = list_dify_datasets(_new_key, _new_url)
                     if _ds_err:
-                        st.error(t("dify_connect_failed").format(error=_ds_err))
+                        st.session_state["dify_connect_error"] = _ds_err
                         st.session_state["dify_datasets"] = []
                     else:
                         st.session_state["dify_datasets"] = _ds_list
-                        if _ds_list:
-                            st.success(f"{t('dify_connected')} — {len(_ds_list)}개 데이터셋")
-                        else:
-                            st.warning(t("dify_no_datasets"))
                 else:
                     st.warning("API Key를 입력하세요.")
 
-            # 데이터셋 선택
+            if _do_refresh and st.session_state.get("dify_api_key"):
+                with st.spinner(t("dify_connecting")):
+                    _ds_list, _ds_err = list_dify_datasets(
+                        st.session_state["dify_api_key"],
+                        st.session_state["dify_api_url"],
+                    )
+                if _ds_err:
+                    st.session_state["dify_connect_error"] = _ds_err
+                else:
+                    st.session_state["dify_connect_error"] = ""
+                    st.session_state["dify_datasets"] = _ds_list
+
+            # 연결 오류 표시
+            if st.session_state["dify_connect_error"]:
+                st.error(t("dify_connect_failed").format(error=st.session_state["dify_connect_error"]))
+
+            # ── 데이터셋 목록 선택 ────────────────────────
             _dify_ds_list = st.session_state.get("dify_datasets", [])
             if _dify_ds_list:
-                _ds_names = [d["name"] for d in _dify_ds_list]
-                _ds_ids   = [d["id"]   for d in _dify_ds_list]
-                _cur_id   = st.session_state.get("dify_dataset_id", "")
-                _cur_idx  = _ds_ids.index(_cur_id) if _cur_id in _ds_ids else 0
-                _sel_idx  = st.selectbox(
-                    t("dify_dataset_label"),
-                    range(len(_ds_names)),
-                    format_func=lambda i: _ds_names[i],
-                    index=_cur_idx,
-                    key="dify_dataset_select",
-                )
-                st.session_state["dify_dataset_id"] = _ds_ids[_sel_idx]
-            elif st.session_state.get("dify_api_key"):
-                st.caption(t("dify_no_datasets"))
+                st.success(t("dify_connected"))
 
-            # 자동 저장 토글
-            st.session_state["dify_auto_save"] = st.checkbox(
-                t("dify_auto_save_label"),
-                value=st.session_state.get("dify_auto_save", False),
-                key="dify_auto_save_chk",
-            )
+                # 현재 선택된 ID의 인덱스 계산
+                _ds_ids  = [d["id"]   for d in _dify_ds_list]
+                _cur_id  = st.session_state.get("dify_dataset_id", "")
+                _cur_idx = _ds_ids.index(_cur_id) if _cur_id in _ds_ids else 0
+
+                def _ds_label(d: dict) -> str:
+                    cnt = d.get("document_count", 0)
+                    desc = d.get("description", "")
+                    suffix = f" ({cnt}개 문서)" if cnt else ""
+                    sub    = f" — {desc[:30]}" if desc else ""
+                    return f"{d['name']}{suffix}{sub}"
+
+                _selected_ds = st.radio(
+                    t("dify_dataset_label"),
+                    options=_dify_ds_list,
+                    format_func=_ds_label,
+                    index=_cur_idx,
+                    key="dify_dataset_radio",
+                )
+                st.session_state["dify_dataset_id"] = _selected_ds["id"]
+
+            elif st.session_state.get("dify_api_key") and not st.session_state["dify_connect_error"]:
+                st.info(t("dify_no_datasets"))
+
+            # ── 자동 저장 ─────────────────────────────────
+            if _dify_ds_list:
+                st.session_state["dify_auto_save"] = st.checkbox(
+                    t("dify_auto_save_label"),
+                    value=st.session_state.get("dify_auto_save", False),
+                    key="dify_auto_save_chk",
+                )
 
     # 3. 메인 영역: 타이틀 및 파일 업로드
     st.title(t("app_title"))
