@@ -35,6 +35,7 @@ from src.translation.engines.ollama import (
     get_ollama_base_url,
     list_ollama_models,
 )
+from src.dify_client import save_to_dify
 
 # 로깅 설정
 logging.basicConfig(level=logging.INFO)
@@ -222,6 +223,85 @@ def main():
                 help="pipeline: 86% 정확도 / vlm-auto-engine: 90% 정확도 (GPU 필요)",
             )
 
+        # --- Dify 지식 베이스 설정 ---
+        st.markdown("---")
+        _dify_init_url = os.getenv("DIFY_API_URL", "https://api.dify.ai/v1")
+        _dify_init_key = os.getenv("DIFY_API_KEY", "")
+        _dify_init_ds  = os.getenv("DIFY_DATASET_ID", "")
+
+        for _k, _v in [
+            ("dify_api_url",    _dify_init_url),
+            ("dify_api_key",    _dify_init_key),
+            ("dify_dataset_id", _dify_init_ds),
+            ("dify_datasets",   []),
+            ("dify_auto_save",  False),
+        ]:
+            if _k not in st.session_state:
+                st.session_state[_k] = _v
+
+        with st.expander(t("dify_section_label"), expanded=bool(st.session_state["dify_api_key"])):
+            st.text_input(
+                t("dify_api_url_label"),
+                value=st.session_state["dify_api_url"],
+                placeholder="https://api.dify.ai/v1",
+                key="dify_api_url_field",
+            )
+            st.text_input(
+                t("dify_api_key_label"),
+                value=st.session_state["dify_api_key"],
+                type="password",
+                placeholder="app-xxxxxxxxxxxx",
+                help=t("dify_api_key_help"),
+                key="dify_api_key_field",
+            )
+
+            if st.button(t("dify_connect_button"), use_container_width=True, key="dify_connect_btn"):
+                _new_url = st.session_state["dify_api_url_field"].strip().rstrip("/") or _dify_init_url
+                _new_key = st.session_state["dify_api_key_field"].strip()
+                st.session_state["dify_api_url"] = _new_url
+                st.session_state["dify_api_key"] = _new_key
+
+                if _new_key:
+                    with st.spinner(t("dify_connecting")):
+                        from src.dify_client import list_dify_datasets
+                        _ds_list, _ds_err = list_dify_datasets(_new_key, _new_url)
+                    if _ds_err:
+                        st.error(t("dify_connect_failed").format(error=_ds_err))
+                        st.session_state["dify_datasets"] = []
+                    else:
+                        st.session_state["dify_datasets"] = _ds_list
+                        if _ds_list:
+                            st.success(f"{t('dify_connected')} — {len(_ds_list)}개 데이터셋")
+                        else:
+                            st.warning(t("dify_no_datasets"))
+                else:
+                    st.warning("API Key를 입력하세요.")
+
+            # 데이터셋 선택
+            _dify_ds_list = st.session_state.get("dify_datasets", [])
+            if _dify_ds_list:
+                _ds_names = [d["name"] for d in _dify_ds_list]
+                _ds_ids   = [d["id"]   for d in _dify_ds_list]
+                _cur_id   = st.session_state.get("dify_dataset_id", "")
+                _cur_idx  = _ds_ids.index(_cur_id) if _cur_id in _ds_ids else 0
+                _sel_idx  = st.selectbox(
+                    t("dify_dataset_label"),
+                    range(len(_ds_names)),
+                    format_func=lambda i: _ds_names[i],
+                    index=_cur_idx,
+                    key="dify_dataset_select",
+                )
+                st.session_state["dify_dataset_id"] = _ds_ids[_sel_idx]
+            elif st.session_state.get("dify_api_key"):
+                st.caption(t("dify_no_datasets"))
+
+            # 자동 저장 토글
+            st.session_state["dify_auto_save"] = st.checkbox(
+                t("dify_auto_save_label"),
+                value=st.session_state.get("dify_auto_save", False),
+                key="dify_auto_save_chk",
+            )
+
     # 3. 메인 영역: 타이틀 및 파일 업로드
     st.title(t("app_title"))
 
@@ -406,6 +486,30 @@ def main():
                 st.session_state.history.insert(0, new_history_item)
                 st.info(t("batch_hint"))
 
+                # Dify 자동 저장
+                if st.session_state.get("dify_auto_save") and st.session_state.get("dify_api_key"):
+                    for _res in results:
+                        _md_path = Path(_res.get("md_path") or "")
+                        if _md_path.exists():
+                            _content = _md_path.read_text(encoding="utf-8")
+                        else:
+                            from src.markdown_generator import markdown_from_html_content
+                            _html = Path(_res["html_path"]).read_text(encoding="utf-8") if Path(_res["html_path"]).exists() else ""
+                            _content = markdown_from_html_content(_html)
+
+                        _doc_name = f"{Path(_res['filename']).stem} [{source_lang}→{target_lang}] {display_time}"
+                        _ok, _msg = save_to_dify(
+                            content=_content,
+                            document_name=_doc_name,
+                            api_key=st.session_state["dify_api_key"],
+                            api_url=st.session_state.get("dify_api_url", "https://api.dify.ai/v1"),
+                            dataset_id=st.session_state.get("dify_dataset_id", ""),
+                        )
+                        if _ok:
+                            st.success(t("dify_save_success").format(message=_msg))
+                        else:
+                            st.error(t("dify_save_failed").format(error=_msg))
+
         finally:
             st.session_state["is_processing"] = False
             st.rerun()
@@ -525,6 +629,55 @@ def main():
                         )
 
                     st.caption(t("download_folder_hint").format(path=output_dir))
+
+                    # Dify 저장 영역
+                    _dify_key = st.session_state.get("dify_api_key", "")
+                    _dify_ds  = st.session_state.get("dify_dataset_id", "")
+                    if _dify_key and _dify_ds:
+                        st.markdown("---")
+                        st.markdown(f"**{t('dify_section_label')}**")
+                        _dify_col1, _dify_col2 = st.columns([3, 1])
+                        with _dify_col1:
+                            _doc_name_default = (
+                                f"{name_stem} [{selected_record.get('source','')}"
+                                f"→{selected_record.get('target','')}"
+                                f"] {selected_record.get('timestamp','')}"
+                            )
+                            _doc_name_input = st.text_input(
+                                t("dify_doc_name_label"),
+                                value=_doc_name_default,
+                                key=f"dify_docname_{selected_idx}_{i}",
+                                label_visibility="collapsed",
+                            )
+                        with _dify_col2:
+                            _dify_indexing = st.selectbox(
+                                t("dify_indexing_label"),
+                                options=["high_quality", "economy"],
+                                format_func=lambda x: t(f"dify_indexing_{x.split('_')[0]}"),
+                                key=f"dify_idx_{selected_idx}_{i}",
+                                label_visibility="collapsed",
+                            )
+                        if st.button(
+                            t("dify_save_button"),
+                            key=f"dify_save_{selected_idx}_{i}",
+                            use_container_width=True,
+                        ):
+                            _save_content = md_bytes.decode("utf-8")
+                            with st.spinner(t("dify_saving")):
+                                _ok, _msg = save_to_dify(
+                                    content=_save_content,
+                                    document_name=_doc_name_input,
+                                    api_key=_dify_key,
+                                    api_url=st.session_state.get("dify_api_url", "https://api.dify.ai/v1"),
+                                    dataset_id=_dify_ds,
+                                    indexing_technique=_dify_indexing,
+                                )
+                            if _ok:
+                                st.success(t("dify_save_success").format(message=_msg))
+                            else:
+                                st.error(t("dify_save_failed").format(error=_msg))
+                    elif _dify_key and not _dify_ds:
+                        st.caption(f"ℹ️ {t('dify_dataset_label')}: {t('dify_dataset_placeholder')}")
 
 if __name__ == "__main__":
     main()
