@@ -146,6 +146,299 @@ def _hwp5_to_markdown(file_path: str, work: Path) -> str:
 
 
 # ---------------------------------------------------------------------------
+# 의미적 HWPX 파서 — rhwp 분석 기반 (2순위)
+# ---------------------------------------------------------------------------
+
+_HEAD_TYPE_MAP = {
+    '0': 'none',    'NONE': 'none',
+    '1': 'outline', 'OUTLINE': 'outline',
+    '2': 'number',  'NUMBER': 'number',
+    '3': 'bullet',  'BULLET': 'bullet',
+}
+_OUTLINE_MARKS = ['#', '##', '###', '####', '#####', '######', '#######']
+_HEADING_STYLE_RE = re.compile(
+    r'^(제목|표제|머리말|Heading|Head|Title)\s*(\d)',
+    re.IGNORECASE,
+)
+
+
+def _lname(tag: str) -> str:
+    """Strip XML namespace prefix from a tag string."""
+    return tag.split('}')[-1] if '}' in tag else tag
+
+
+def _attr(elem: ET.Element, *local_names: str) -> Optional[str]:
+    """Return first attribute value matching any of the given local names (ignores namespace)."""
+    for key, val in elem.attrib.items():
+        if (_lname(key)) in local_names:
+            return val
+    return None
+
+
+def _infer_heading_from_style_name(name: str) -> tuple:
+    """Infer (head_type, 0-indexed level) from a style name string, or ('none', 0)."""
+    m = _HEADING_STYLE_RE.match(name.strip())
+    if m:
+        return 'outline', max(0, int(m.group(2)) - 1)
+    return 'none', 0
+
+
+def _collect_para_shapes(root: ET.Element, out: dict) -> None:
+    """Populate *out* with {id: {head_type, level}} from <paraPr> elements."""
+    for elem in root.iter():
+        if _lname(elem.tag) not in ('paraPr', 'paraShape'):
+            continue
+        id_val = _attr(elem, 'id', 'ID')
+        if id_val is None:
+            continue
+        raw_ht, raw_lv = '0', '0'
+        for child in elem:
+            if _lname(child.tag) == 'heading':
+                raw_ht = _attr(child, 'type', 'Type', 'headType') or raw_ht
+                raw_lv = _attr(child, 'level', 'Level') or raw_lv
+                break
+        out[id_val] = {
+            'head_type': _HEAD_TYPE_MAP.get(raw_ht.upper(), 'none'),
+            'level': int(raw_lv) if raw_lv.isdigit() else 0,
+        }
+
+
+def _collect_styles(root: ET.Element, out: dict) -> None:
+    """Populate *out* with {id: {name, paraPrIDRef}} from <style> elements."""
+    for elem in root.iter():
+        if _lname(elem.tag) != 'style':
+            continue
+        id_val = _attr(elem, 'id', 'ID')
+        if id_val is None:
+            continue
+        out[id_val] = {
+            'name': _attr(elem, 'name', 'Name') or '',
+            'paraPrIDRef': _attr(elem, 'paraPrIDRef', 'paraPrId', 'paraPrRef') or '',
+        }
+
+
+def _parse_hwpx_style_maps(
+    z: zipfile.ZipFile,
+    all_names: List[str],
+) -> tuple:
+    """Read all header XML files from the ZIP and return (para_shape_map, style_map)."""
+    para_shape_map: dict = {}
+    style_map: dict = {}
+    header_files = [
+        n for n in all_names
+        if n.endswith('.xml')
+        and any(kw in n.lower() for kw in ('header', 'settings', 'parashape', 'styles'))
+        and 'section' not in n.lower()
+    ]
+    for hf in header_files:
+        try:
+            with z.open(hf) as f:
+                root = ET.fromstring(f.read())
+            _collect_para_shapes(root, para_shape_map)
+            _collect_styles(root, style_map)
+        except Exception:
+            pass
+    return para_shape_map, style_map
+
+
+def _resolve_semantic(
+    p_elem: ET.Element,
+    para_shape_map: dict,
+    style_map: dict,
+) -> tuple:
+    """
+    Return (head_type, level) for a <p> element via 3-level lookup:
+    1. paraPrIDRef → para_shape_map
+    2. styleIDRef → style.paraPrIDRef → para_shape_map
+    3. styleIDRef → style.name → name inference
+    """
+    para_pr_id = _attr(p_elem, 'paraPrIDRef', 'paraPrId', 'paraPrRef')
+    style_id   = _attr(p_elem, 'styleIDRef',  'styleId',  'styleRef')
+
+    if para_pr_id and para_pr_id in para_shape_map:
+        shape = para_shape_map[para_pr_id]
+        if shape['head_type'] != 'none':
+            return shape['head_type'], shape['level']
+
+    if style_id and style_id in style_map:
+        s = style_map[style_id]
+        ref = s.get('paraPrIDRef', '')
+        if ref and ref in para_shape_map:
+            shape = para_shape_map[ref]
+            if shape['head_type'] != 'none':
+                return shape['head_type'], shape['level']
+        ht, lv = _infer_heading_from_style_name(s.get('name', ''))
+        if ht != 'none':
+            return ht, lv
+
+    return 'none', 0
+
+
+def _collect_text_nodes(elem: ET.Element, chars: List[str]) -> None:
+    """Recursively collect <t> text content, skipping <tbl> subtrees."""
+    for child in elem:
+        if _lname(child.tag) == 'tbl':
+            continue
+        if _lname(child.tag) == 't' and child.text:
+            chars.append(child.text)
+        _collect_text_nodes(child, chars)
+
+
+def _extract_para_text(elem: ET.Element) -> str:
+    chars: List[str] = []
+    _collect_text_nodes(elem, chars)
+    return ''.join(chars).strip()
+
+
+def _in_table(elem: ET.Element, parent_map: dict) -> bool:
+    """Return True if any ancestor of elem is a <tbl>, <tr>, or <tc> element."""
+    p = parent_map.get(elem)
+    while p is not None:
+        if _lname(p.tag) in ('tbl', 'tc', 'tr'):
+            return True
+        p = parent_map.get(p)
+    return False
+
+
+def _find_tbl(elem: ET.Element) -> Optional[ET.Element]:
+    """Return first <tbl> descendant of elem, or None."""
+    for desc in elem.iter():
+        if _lname(desc.tag) == 'tbl':
+            return desc
+    return None
+
+
+def _find_direct(elem: ET.Element, local_name: str) -> List[ET.Element]:
+    return [c for c in elem if _lname(c.tag) == local_name]
+
+
+def _table_to_md(tbl_elem: ET.Element) -> str:
+    """Convert a <tbl> element to a Markdown table string."""
+    rows: List[List[str]] = []
+
+    tr_elems = _find_direct(tbl_elem, 'tr')
+    if not tr_elems:
+        for child in tbl_elem:
+            tr_elems.extend(_find_direct(child, 'tr'))
+
+    for tr in tr_elems:
+        cells: List[str] = []
+        for tc in _find_direct(tr, 'tc'):
+            cell_parts: List[str] = []
+            for p in tc:
+                if _lname(p.tag) == 'p':
+                    chars: List[str] = []
+                    _collect_text_nodes(p, chars)
+                    text = ''.join(chars).strip()
+                    if text:
+                        cell_parts.append(text)
+            cells.append(
+                ' '.join(cell_parts).replace('|', '\\|').replace('\n', ' ')
+            )
+        if cells:
+            rows.append(cells)
+
+    if not rows:
+        return ''
+
+    max_cols = max(len(r) for r in rows)
+    rows = [r + [''] * (max_cols - len(r)) for r in rows]
+    header, sep = rows[0], ['---'] * max_cols
+    md_lines = [
+        '| ' + ' | '.join(header) + ' |',
+        '| ' + ' | '.join(sep) + ' |',
+    ]
+    for row in rows[1:]:
+        md_lines.append('| ' + ' | '.join(row) + ' |')
+    return '\n'.join(md_lines)
+
+
+def _para_to_md(text: str, head_type: str, level: int, counters: dict) -> str:
+    """Format a paragraph as a Markdown line based on its semantic type."""
+    if head_type == 'outline':
+        prefix = _OUTLINE_MARKS[min(level, 6)]
+        return f'\n{prefix} {text}\n'
+    if head_type == 'number':
+        n = counters.get(level, 0) + 1
+        counters[level] = n
+        for k in list(counters):
+            if k > level:
+                del counters[k]
+        return '  ' * level + f'{n}. {text}'
+    if head_type == 'bullet':
+        return '  ' * level + f'- {text}'
+    return text + '\n'
+
+
+def parse_hwpx_to_markdown(file_path: str) -> Optional[str]:
+    """
+    HWPX 파일의 의미적 구조를 Markdown으로 추출합니다.
+
+    HwpForge 미설치 시 2순위 파서로 사용됩니다:
+    - OUTLINE 단락  → Markdown 제목 (#, ##, ...)
+    - NUMBER  단락  → 번호 목록  (1., 2., ...)
+    - BULLET  단락  → 글머리 기호 목록 (-)
+    - 표             → Markdown 테이블
+    """
+    try:
+        with zipfile.ZipFile(file_path, 'r') as z:
+            all_names = z.namelist()
+            para_shape_map, style_map = _parse_hwpx_style_maps(z, all_names)
+
+            section_files = sorted(
+                n for n in all_names
+                if re.match(r'Contents/section\d+\.xml', n)
+            )
+            if not section_files:
+                section_files = sorted(
+                    n for n in all_names
+                    if n.endswith('.xml') and 'section' in n.lower()
+                )
+
+            md_lines: List[str] = []
+            counters: dict = {}
+
+            for sf in section_files:
+                with z.open(sf) as f:
+                    root = ET.fromstring(f.read())
+
+                parent_map = {c: p for p in root.iter() for c in p}
+
+                for elem in root.iter():
+                    if _lname(elem.tag) != 'p':
+                        continue
+                    if _in_table(elem, parent_map):
+                        continue
+
+                    tbl = _find_tbl(elem)
+                    if tbl is not None:
+                        table_md = _table_to_md(tbl)
+                        if table_md:
+                            md_lines.append('')
+                            md_lines.append(table_md)
+                            md_lines.append('')
+                        continue
+
+                    text = _extract_para_text(elem)
+                    if not text:
+                        continue
+
+                    head_type, level = _resolve_semantic(elem, para_shape_map, style_map)
+                    md_lines.append(_para_to_md(text, head_type, level, counters))
+
+    except zipfile.BadZipFile:
+        raise ValueError(f"올바른 HWPX 파일이 아닙니다: {file_path}")
+    except Exception as exc:
+        logging.warning(
+            f"[HWPX 의미 파서] '{Path(file_path).name}' 파싱 실패: {exc}"
+        )
+        return None
+
+    result = re.sub(r'\n{3,}', '\n\n', '\n'.join(md_lines)).strip()
+    return (result + '\n') if result else None
+
+
+# ---------------------------------------------------------------------------
 # 폴백 ① — HWPX: 표준 라이브러리 ZIP + XML
 # ---------------------------------------------------------------------------
 

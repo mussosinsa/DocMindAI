@@ -364,7 +364,7 @@ def process_hwp_file(
     """
     from src.hwp_parser import (
         is_hwpforge_available, parse_to_markdown,
-        parse_hwp, parse_hwpx,
+        parse_hwp, parse_hwpx, parse_hwpx_to_markdown,
     )
     from src.text_parser import TextFileParser, TextSegment
 
@@ -419,7 +419,22 @@ def process_hwp_file(
             logging.warning(f"[{file_name}] HwpForge 파싱 실패, 폴백: {e}")
             use_markdown = False
 
-    # 1-b. 폴백 파서
+    # 1-b. HWPX 의미 파서 — HwpForge 미설치 또는 실패 시 (rhwp 분석 기반)
+    if not use_markdown and ext == '.hwpx':
+        try:
+            md_content = parse_hwpx_to_markdown(file_path)
+            if md_content:
+                parser = TextFileParser()
+                segments = parser._parse_markdown(md_content)
+                use_markdown = True
+                logging.info(
+                    f"[{file_name}] HWPX 의미 파서 성공: "
+                    f"{len(segments)}개 세그먼트"
+                )
+        except Exception as e:
+            logging.warning(f"[{file_name}] HWPX 의미 파서 실패, 폴백: {e}")
+
+    # 1-c. 일반 텍스트 폴백 파서
     if not use_markdown:
         try:
             if ext == '.hwpx':
@@ -485,7 +500,12 @@ def process_hwp_file(
     if progress_cb:
         progress_cb(0.85, msgs["saving"].format(file_name=file_name))
 
-    parser_label = "HwpForge" if use_hwpforge and use_markdown else "fallback"
+    if not use_markdown:
+        parser_label = "fallback"
+    elif use_hwpforge:
+        parser_label = "HwpForge"
+    else:
+        parser_label = "semantic"
     raw_ext = ext.lstrip('.')
     file_type = f"{get_file_type_display(raw_ext)} · {parser_label}"
 
