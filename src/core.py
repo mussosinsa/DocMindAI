@@ -781,6 +781,8 @@ def process_single_file(
     max_workers: int = 1,
     progress_cb: Optional[ProgressCallback] = None,
     ui_lang: str = "ko",
+    vision_ollama_url: Optional[str] = None,
+    vision_model: str = "gemma4:e4b",
 ) -> dict:
     """
     단일 파일을 처리하는 핵심 파이프라인입니다.
@@ -960,16 +962,37 @@ def process_single_file(
     )
     logging.info(f"[{file_name}] 일괄 번역 완료 ({t_trans_end - t_trans_start:.2f}초)")
 
-    # --- Phase 3: HTML Generation (HTML 생성) ---
+    # --- Phase 3: Vision 텍스트 추출 (이미지/도형 → Ollama 멀티모달) ---
+    vision_map: dict = {}
+    if vision_ollama_url:
+        from src.vision_extractor import extract_picture_texts
+        if progress_cb:
+            progress_cb(0.83, f"🔍 이미지/도형 텍스트 추출 중... ({file_name})")
+        try:
+            vision_map = extract_picture_texts(
+                doc_items=doc_items,
+                doc=doc,
+                output_dir=output_dir,
+                base_filename=base_filename,
+                ollama_base_url=vision_ollama_url,
+                model=vision_model,
+            )
+            logging.info(
+                f"[{file_name}] Vision 추출 완료: {len(vision_map)}개 이미지"
+            )
+        except Exception as exc:
+            logging.warning(f"[{file_name}] Vision 추출 실패 (이미지 표시로 폴백): {exc}")
+
+    # --- Phase 4: HTML Generation (HTML 생성) ---
     if progress_cb:
         progress_cb(0.85, msgs["saving"].format(file_name=file_name))
 
     path_html = output_dir / f"{base_filename}_interactive.html"
-    
+
     # HTML 생성 시 이미지 저장 진행률 반영 (나머지 15%)
     GEN_BASE = 0.85
     GEN_SPAN = 0.15
-    
+
     def _gen_progress(local_ratio: float, msg: str):
         if progress_cb:
             global_ratio = GEN_BASE + GEN_SPAN * local_ratio
@@ -981,7 +1004,8 @@ def process_single_file(
         translation_map,
         output_dir,
         base_filename,
-        progress_cb=_gen_progress
+        progress_cb=_gen_progress,
+        vision_map=vision_map or None,
     )
 
     with open(path_html, "w", encoding="utf-8") as f:
@@ -994,6 +1018,7 @@ def process_single_file(
         translation_map,
         output_dir,
         base_filename,
+        vision_map=vision_map or None,
     )
     path_md = output_dir / f"{base_filename}_translated.md"
     with open(path_md, "w", encoding="utf-8") as f:
@@ -1009,6 +1034,8 @@ def process_single_file(
         source_lang=source_lang,
         target_lang=target_lang,
         timestamp=datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+        vision_map=vision_map or None,
+        base_filename=base_filename,
     )
     path_json = output_dir / f"{base_filename}_rag.json"
     with open(path_json, "w", encoding="utf-8") as f:
@@ -1039,6 +1066,8 @@ def process_document(
     ui_lang: str = "ko",
     parser_backend: str = "docling",
     mineru_backend: str = "pipeline",
+    vision_ollama_url: Optional[str] = None,
+    vision_model: str = "gemma4:e4b",
 ) -> dict:
     """
     외부(app.py, main.py)에서 호출하기 위한 편의성 래퍼 함수입니다.
@@ -1046,9 +1075,8 @@ def process_document(
     Args:
         parser_backend: "docling" (기본) | "mineru" (고품질 PDF 분석)
         mineru_backend: MinerU 엔진 선택
-            - "pipeline"           : CPU 친화적 (기본)
-            - "vlm-auto-engine"    : 고정확도, GPU 권장
-            - "hybrid-auto-engine" : 균형 잡힌 성능
+        vision_ollama_url: 이미지/도형 텍스트 추출용 Ollama URL. None이면 Vision 비활성화.
+        vision_model: Vision 모델 이름 (기본: gemma4:e4b)
     """
     # MinerU 백엔드: PDF/이미지 파일에만 적용 (DOCX/PPTX는 Docling 사용)
     mineru_supported_exts = {'.pdf', '.png', '.jpg', '.jpeg', '.bmp', '.tiff', '.tif', '.webp'}
@@ -1078,4 +1106,6 @@ def process_document(
         max_workers=max_workers,
         progress_cb=progress_cb,
         ui_lang=ui_lang,
+        vision_ollama_url=vision_ollama_url,
+        vision_model=vision_model,
     )

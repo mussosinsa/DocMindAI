@@ -138,6 +138,24 @@ def main():
                 "서버 URL: `http://host.docker.internal:11434`"
             )
 
+        # --- Vision(이미지/도형 텍스트 추출) 설정 ---
+        with st.expander("🔍 Vision 이미지 추출 설정", expanded=False):
+            if "vision_model" not in st.session_state:
+                st.session_state["vision_model"] = "gemma4:e4b"
+            st.session_state["vision_model"] = st.text_input(
+                "Vision 모델",
+                value=st.session_state["vision_model"],
+                placeholder="gemma4:e4b",
+                key="vision_model_input",
+                help="이미지·도형에서 텍스트를 추출할 Ollama 멀티모달 모델명.",
+            )
+            st.caption(
+                "📌 문서(PDF/DOCX)의 이미지·도형에서 텍스트를 자동 추출합니다.\n\n"
+                "Ollama에 Vision 모델이 로드되어 있어야 합니다:\n"
+                "```\nollama pull gemma4:e4b\n```\n"
+                "추출 실패 시 원본 이미지를 그대로 표시합니다."
+            )
+
         # 현재 세션에서 사용할 Ollama URL
         _ollama_url = st.session_state["ollama_base_url"]
         # OllamaTranslator 는 os.getenv("OLLAMA_BASE_URL") 을 참조하므로
@@ -479,14 +497,17 @@ def main():
                         ui_lang=get_current_lang(),
                         parser_backend=parser_backend,
                         mineru_backend=mineru_backend,
+                        vision_ollama_url=st.session_state.get("ollama_base_url") or None,
+                        vision_model=st.session_state.get("vision_model", "gemma4:e4b"),
                     )
-                    
+
                     if result:
                         results.append({
                             "filename": uploaded_file.name,
                             "output_dir": str(result["output_dir"]),
                             "html_path": str(result["html_path"]),
-                            "md_path": str(result["md_path"]) if result.get("md_path") else None,
+                            "md_path":   str(result["md_path"])   if result.get("md_path")   else None,
+                            "json_path": str(result["json_path"]) if result.get("json_path") else None,
                         })
                     
                     # 임시 파일 삭제

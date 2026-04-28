@@ -35,6 +35,7 @@ def generate_docling_markdown(
     translation_map: dict,
     output_dir: Path,
     base_filename: str,
+    vision_map: Optional[dict] = None,
 ) -> str:
     """
     DoclingDocument 아이템과 번역 맵을 Markdown 문자열로 직렬화한다.
@@ -123,12 +124,21 @@ def generate_docling_markdown(
             alt_text = "table" if isinstance(item, TableItem) else "image"
 
             if image_path:
-                lines.append("")
-                lines.append(f"![{translated_caption or alt_text}]({image_path})")
-                if translated_caption:
+                # ── PictureItem: Vision 텍스트가 있으면 텍스트 우선 출력 ──
+                if isinstance(item, PictureItem) and vision_map and image_path in vision_map:
+                    extracted = vision_map[image_path]
                     lines.append("")
-                    lines.append(f"*{translated_caption}*")
-                lines.append("")
+                    lines.append(extracted)
+                    lines.append("")
+                    lines.append(f"> 📎 [{translated_caption or '원본 이미지'}]({image_path})")
+                    lines.append("")
+                else:
+                    lines.append("")
+                    lines.append(f"![{translated_caption or alt_text}]({image_path})")
+                    if translated_caption:
+                        lines.append("")
+                        lines.append(f"*{translated_caption}*")
+                    lines.append("")
 
             # 표는 Markdown 테이블로도 내보낸다 (셀 번역 반영)
             if isinstance(item, TableItem):

@@ -70,6 +70,8 @@ def generate_docling_rag_json(
     source_lang: str,
     target_lang: str,
     timestamp: str = "",
+    vision_map: Optional[dict] = None,
+    base_filename: str = "",
 ) -> dict:
     """
     DoclingDocument 아이템 리스트로부터 RAG용 JSON 딕셔너리를 생성합니다.
@@ -169,8 +171,27 @@ def generate_docling_rag_json(
         # ── PictureItem ───────────────────────────────────────────────────
         elif isinstance(item, PictureItem):
             caption_src = (item.caption_text(doc) or "").strip()
-            if caption_src:
-                caption_tgt = _tr(caption_src)
+            caption_tgt = _tr(caption_src) if caption_src else ""
+
+            # vision_map 조회: 키는 images/{base_filename}_picture_N.png
+            pic_counter = sum(
+                1 for c in chunks if c.get("type") in ("image_extracted", "image_caption")
+            ) + 1
+            _bfn = base_filename or filename.rsplit(".", 1)[0]
+            img_rel = f"images/{_bfn}_picture_{pic_counter}.png"
+
+            if vision_map and img_rel in vision_map:
+                chunks.append({
+                    "id": chunk_id, "type": "image_extracted", "heading_level": None,
+                    "text": vision_map[img_rel],
+                    "source_text": caption_src or img_rel,
+                    "image_path": img_rel,
+                    "caption": caption_tgt,
+                    "page": current_page, "line": None,
+                    "section_path": section_path[:],
+                    "chunk_context": _section_ctx(section_path),
+                })
+            elif caption_src:
                 chunks.append({
                     "id": chunk_id, "type": "image_caption", "heading_level": None,
                     "text": caption_tgt, "source_text": caption_src,
@@ -178,7 +199,9 @@ def generate_docling_rag_json(
                     "section_path": section_path[:],
                     "chunk_context": _section_ctx(section_path),
                 })
-                chunk_id += 1
+            else:
+                continue
+            chunk_id += 1
 
     result = {"meta": _make_meta(filename, source_lang, target_lang, timestamp), "chunks": chunks}
     result["meta"]["total_chunks"] = len(chunks)

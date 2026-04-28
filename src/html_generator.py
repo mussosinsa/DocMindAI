@@ -261,6 +261,19 @@ HTML_HEADER = """
         img { max-width: 100%; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
         .caption { color: var(--sub-text-color); margin-top: 10px; font-style: italic; font-size: 0.9em; }
 
+        /* Vision 추출 텍스트 블록 */
+        .vision-tgt { border-left: 3px solid #4a9eff; padding-left: 12px; }
+        .vision-text { line-height: 1.8; margin-bottom: 10px; white-space: pre-wrap; }
+        .image-ref { margin-top: 8px; }
+        .image-ref-link {
+            display: inline-flex; align-items: center; gap: 4px;
+            font-size: 0.85em; color: var(--sub-text-color);
+            text-decoration: none; padding: 3px 8px;
+            border: 1px solid var(--border-color); border-radius: 12px;
+            transition: all 0.2s;
+        }
+        .image-ref-link:hover { color: #4a9eff; border-color: #4a9eff; background: var(--hover-color); }
+
         /* 모바일 반응형 */
         @media (max-width: 768px) {
             .view-mode-inspect .paragraph-row { grid-template-columns: 1fr; }
@@ -498,7 +511,8 @@ def generate_html_content(
     translation_map: dict,
     output_dir: Path,
     base_filename: str,
-    progress_cb: Optional[ProgressCallback] = None
+    progress_cb: Optional[ProgressCallback] = None,
+    vision_map: Optional[dict] = None,
 ) -> str:
     """
     Docling 문서 아이템과 번역 맵을 결합하여 인터랙티브 HTML 컨텐츠를 생성합니다.
@@ -641,21 +655,47 @@ def generate_html_content(
 
         elif isinstance(item, (TableItem, PictureItem)):
             image_path = save_and_get_image_path(item, doc, output_dir, base_filename, counters)
-            
+
             if image_path:
                 alt_text = "table" if isinstance(item, TableItem) else "image"
-                
-                html_parts.append(f"""
+
+                # ── PictureItem: Vision 추출 텍스트가 있으면 텍스트 우선 표시 ──
+                if isinstance(item, PictureItem) and vision_map and image_path in vision_map:
+                    extracted_text = html.escape(vision_map[image_path])
+                    orig_caption   = item.caption_text(doc) or ""
+                    trans_caption  = translation_map.get(orig_caption, orig_caption)
+
+                    html_parts.append('<div class="paragraph-row">')
+                    # 원문 블록 (검수 모드용) — 이미지 참조
+                    html_parts.append(
+                        f'<div class="src-block vision-src">'
+                        f'<a href="{image_path}" target="_blank" class="image-ref-link">'
+                        f'🖼 {html.escape(orig_caption) or alt_text}</a>'
+                        f'</div>'
+                    )
+                    # 번역 블록 — 추출된 텍스트 + 이미지 참조 링크
+                    html_parts.append(
+                        f'<div class="tgt-block vision-tgt">'
+                        f'<div class="vision-text">{extracted_text}</div>'
+                        f'<div class="image-ref">'
+                        f'<a href="{image_path}" target="_blank" class="image-ref-link">'
+                        f'📎 {html.escape(trans_caption) or "원본 이미지 보기"}'
+                        f'</a></div>'
+                        f'</div>'
+                    )
+                    html_parts.append('</div>')
+
+                else:
+                    # 기존 방식: 이미지 직접 표시
+                    html_parts.append(f"""
                 <div class="full-width">
                     <img src="{image_path}" alt="{alt_text}">
                 """)
-                
-                orig_caption = item.caption_text(doc)
-                if orig_caption:
-                    trans_caption = translation_map.get(orig_caption, "")
-                    html_parts.append(f'<div class="caption">{html.escape(trans_caption)}</div>\n') 
-                
-                html_parts.append(f"</div>\n")
+                    orig_caption = item.caption_text(doc)
+                    if orig_caption:
+                        trans_caption = translation_map.get(orig_caption, "")
+                        html_parts.append(f'<div class="caption">{html.escape(trans_caption)}</div>\n')
+                    html_parts.append(f"</div>\n")
 
                 # [NEW] 번역된 표 렌더링 (HTML Table with Hover Tooltips)
                 if isinstance(item, TableItem):
